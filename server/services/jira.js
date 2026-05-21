@@ -8,7 +8,7 @@ export async function getJiraItems() {
     : '';
   const jql = `assignee = currentUser() AND status not in (Done, Closed, Resolved)${projectClause} ORDER BY updated DESC`;
 
-  const url = `https://${JIRA_HOST}/rest/api/3/search?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,description,issuetype,priority,status,labels,customfield_10016,updated`;
+  const url = `https://${JIRA_HOST}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,description,issuetype,priority,status,labels,customfield_10016,updated`;
 
   let res;
   try {

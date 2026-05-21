@@ -30,17 +30,21 @@ function inferCategoryFromLabels(labels) {
 
 export async function getGitHubItems() {
   const items = [];
+  const includeIssues = process.env.GITHUB_INCLUDE_ISSUES !== 'false';
 
   // @me is resolved by gh CLI to the authenticated user — no token config needed
-  const [reviewRes, myPRRes, issueRes] = await Promise.allSettled([
+  const calls = [
     ghApi('search/issues?q=is:pr+state:open+review-requested:@me&per_page=50'),
-    ghApi('search/issues?q=is:pr+state:open+author:@me+review:changes_requested&per_page=25'),
-    ghApi('search/issues?q=is:issue+state:open+assignee:@me&per_page=50')
-  ]);
+    ghApi('search/issues?q=is:pr+state:open+author:@me+review:changes_requested&per_page=25')
+  ];
+  if (includeIssues) {
+    calls.push(ghApi('search/issues?q=is:issue+state:open+assignee:@me&per_page=50'));
+  }
+  const [reviewRes, myPRRes, issueRes] = await Promise.allSettled(calls);
 
   const reviewPRs = reviewRes.status === 'fulfilled' ? reviewRes.value.items : [];
   const myPRs = myPRRes.status === 'fulfilled' ? myPRRes.value.items : [];
-  const assignedIssues = issueRes.status === 'fulfilled' ? issueRes.value.items : [];
+  const assignedIssues = issueRes?.status === 'fulfilled' ? issueRes.value.items : [];
 
   // Deduplicate by URL
   const allPRItems = [...reviewPRs];
