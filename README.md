@@ -36,6 +36,7 @@ Opens at `http://localhost:5173`. The Express API runs on `:3001`.
 | `JIRA_PROJECT_KEYS` | Comma-separated project keys to include, e.g. `PROJ,API` |
 | `JIRA_SPOTLIGHT_PROJECT` | A project key that gets its own dedicated column, e.g. `SOC` |
 | `LOCAL_REPO_BASE` | Parent directory of your local git repos (default: `~/development`) |
+| `GITHUB_INCLUDE_ISSUES` | Set to `false` to hide assigned GitHub issues and only show PRs (default: `true`) |
 
 GitHub auth is handled entirely by the `gh` CLI — no token needed in `.env`.
 

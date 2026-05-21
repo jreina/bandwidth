@@ -52,7 +52,7 @@ Each item has an `effort` field (`small` | `medium` | `large`). The energy selec
 
 ### GitHub integration
 
-`server/services/github.js` uses the **`gh` CLI** via `spawn('gh', ['api', endpoint], { shell: true })` — no token config required, just `gh auth login`. Three searches run in parallel: review-requested PRs, my PRs with changes-requested, and assigned issues. PRs then get a second detail call to retrieve the branch name and additions/deletions for effort estimation.
+`server/services/github.js` uses the **`gh` CLI** via `spawn('gh', ['api', endpoint], { shell: true })` — no token config required, just `gh auth login`. Two-to-three searches run in parallel: review-requested PRs, my PRs with changes-requested, and (when `GITHUB_INCLUDE_ISSUES` is not `false`) assigned issues. PRs then get a second detail call to retrieve the branch name and additions/deletions for effort estimation.
 
 ### Jira integration
 
@@ -73,3 +73,4 @@ Copy `.env.example` to `.env` at the repo root. The server loads it from `../  .
 | `JIRA_PROJECT_KEYS` | Comma-separated keys to filter JQL results |
 | `JIRA_SPOTLIGHT_PROJECT` | Project key that gets its own category column |
 | `LOCAL_REPO_BASE` | Parent dir of local repos; defaults to `~/development` |
+| `GITHUB_INCLUDE_ISSUES` | Set to `false` to skip the assigned-issues fetch; PRs only. Defaults to `true` |
