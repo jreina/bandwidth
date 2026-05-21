@@ -25,5 +25,5 @@ app.use('/api/jira', jiraRoutes);
 app.use('/api/worktrees', worktreeRoutes);
 
 app.listen(PORT, () => {
-  console.log(`Attention Budget server → http://localhost:${PORT}`);
+  console.log(`bandwidth server → http://localhost:${PORT}`);
 });

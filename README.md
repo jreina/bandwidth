@@ -1,6 +1,8 @@
-# Attention Budget
+# bandwidth
 
 A personal dashboard that asks *"what do you have energy to work on?"* — pulls your open GitHub PRs, review requests, and Jira tickets into one view, filtered by how much focus you have right now.
+
+This was not my original idea and I definitely stole it from [Scott Hanselman](https://github.com/shanselman). This is also 100% vibe coded so use at your own risk.
 
 ## Prerequisites
 
