@@ -1,4 +1,5 @@
 import simpleGit from 'simple-git';
+import { spawn } from 'child_process';
 import { join } from 'path';
 import { homedir } from 'os';
 import { existsSync } from 'fs';
@@ -71,4 +72,18 @@ export async function removeWorktree(repoName, branch) {
   const worktreePath = getWorktreePath(repoName, branch);
   const git = simpleGit(repoPath);
   await git.raw(['worktree', 'remove', '--force', worktreePath]);
+}
+
+export function openInCode(worktreePath) {
+  if (!existsSync(worktreePath)) {
+    throw new Error(`Path not found: ${worktreePath}`);
+  }
+  // Use `open -a` so Launch Services starts VS Code with the user's login env,
+  // not the dev server's (which has nvm shims / a modified PATH).
+  const child = spawn('open', ['-a', 'Visual Studio Code', worktreePath], {
+    detached: true,
+    stdio: 'ignore',
+    env: { HOME: process.env.HOME, PATH: '/usr/bin:/bin:/usr/sbin:/sbin' }
+  });
+  child.unref();
 }

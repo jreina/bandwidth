@@ -35,6 +35,22 @@ export default function WorkItem({ item, worktree, onCreateWorktree, onRemoveWor
     }
   }
 
+  async function openInCode() {
+    if (!activeWorktree?.path) return;
+    setErr(null);
+    try {
+      const res = await fetch('/api/worktrees/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: activeWorktree.path })
+      });
+      const data = await res.json();
+      if (data?.error) setErr(data.error);
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
   return (
     <div className={`work-item ${activeWorktree ? 'has-worktree' : ''}`}>
       <div className="item-badges">
@@ -63,13 +79,23 @@ export default function WorkItem({ item, worktree, onCreateWorktree, onRemoveWor
             </div>
           )}
           {err && <span className="worktree-error">{err}</span>}
-          <button
-            className={`worktree-btn ${activeWorktree ? 'remove' : 'create'}`}
-            onClick={toggleWorktree}
-            disabled={busy}
-          >
-            {busy ? '…' : activeWorktree ? 'Remove worktree' : 'Create worktree'}
-          </button>
+          <div className="worktree-actions">
+            <button
+              className={`worktree-btn ${activeWorktree ? 'remove' : 'create'}`}
+              onClick={toggleWorktree}
+              disabled={busy}
+            >
+              {busy ? '…' : activeWorktree ? 'Remove worktree' : 'Create worktree'}
+            </button>
+            {activeWorktree && (
+              <button
+                className="worktree-btn open"
+                onClick={openInCode}
+              >
+                Open in Code
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
