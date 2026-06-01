@@ -51,4 +51,10 @@ GitHub auth is handled entirely by the `gh` CLI — no token needed in `.env`.
 
 **Categories** — items are bucketed into Code Review, Bugs, Tasks, and Docs based on PR labels and Jira issue types. If `JIRA_SPOTLIGHT_PROJECT` is set, that project gets its own column.
 
-**Git worktrees** — GitHub PRs have a "Create worktree" button. Clicking it runs `git worktree add` so you can context-switch between tasks without stashing. The worktree path is shown on the card; "Remove worktree" cleans it up. Worktrees are created at `{LOCAL_REPO_BASE}/{repo-name}-worktrees/{branch-name}`.
+**Git worktrees** — GitHub PRs have a "Create worktree" button. Clicking it runs `git worktree add` so you can context-switch between tasks without stashing. The worktree path is shown on the card; "Remove worktree" cleans it up. "Open in Code" launches VS Code on the worktree. Worktrees are created at `{LOCAL_REPO_BASE}/{repo-name}-worktrees/{branch-name}`.
+
+Jira items also get a worktree button. If a local branch already mentions the issue key (e.g. `feature/SOC-123-foo`), the matching repo + branch are auto-detected. Otherwise you pick a repo from a dropdown of everything under `LOCAL_REPO_BASE`, and the worktree is created on a fresh branch named `{KEY}-{slugified-summary}`. The repo you picked is remembered per Jira project, so the next ticket in that project defaults to the same repo.
+
+**Stale worktrees** — when a PR is merged (or a Jira ticket closed) the worktree stays on disk but no longer matches an active item. Any unmatched worktrees show up in a "Stale worktrees" section at the bottom of the page with Open and Remove buttons so you can clean them up.
+
+**"Open in Code" prerequisite** — the server uses `open -a "Visual Studio Code"` on macOS. VS Code must be installed in `/Applications`; the `code` CLI itself is not required.
