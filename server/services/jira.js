@@ -1,3 +1,26 @@
+import { listAllBranchesAcrossRepos } from './git.js';
+
+function slugify(s) {
+  return (s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+}
+
+function findBranchMatches(key, branchesByRepo) {
+  const re = new RegExp(`(^|[^a-z0-9])${key.toLowerCase()}([^0-9]|$)`);
+  const matches = [];
+  for (const [repoName, branches] of Object.entries(branchesByRepo)) {
+    for (const branch of branches) {
+      if (re.test(branch.toLowerCase())) {
+        matches.push({ repoName, branch });
+      }
+    }
+  }
+  return matches;
+}
+
 export async function getJiraItems() {
   const { JIRA_HOST, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_PROJECT_KEYS } = process.env;
   if (!JIRA_HOST || !JIRA_EMAIL || !JIRA_API_TOKEN) return [];
@@ -27,6 +50,11 @@ export async function getJiraItems() {
 
   const data = await res.json();
 
+  let branchesByRepo = {};
+  try {
+    branchesByRepo = await listAllBranchesAcrossRepos();
+  } catch {}
+
   return data.issues.map(issue => {
     const points = issue.fields.customfield_10016;
     let effort = 'medium';
@@ -49,6 +77,10 @@ export async function getJiraItems() {
 
     const bodyText = issue.fields.description?.content?.[0]?.content?.[0]?.text || '';
 
+    const suggestedBranch = `${issue.key}-${slugify(issue.fields.summary)}`;
+    const matches = findBranchMatches(issue.key, branchesByRepo);
+    const single = matches.length === 1 ? matches[0] : null;
+
     return {
       id: `jira-${issue.key}`,
       title: `[${issue.key}] ${issue.fields.summary}`,
@@ -57,9 +89,12 @@ export async function getJiraItems() {
       source: 'jira',
       category,
       effort,
-      repo: null,
-      repoName: null,
-      branch: null,
+      repo: single ? single.repoName : null,
+      repoName: single ? single.repoName : null,
+      branch: single ? single.branch : null,
+      suggestedBranch,
+      branchMatches: matches,
+      projectKey,
       key: issue.key,
       subtitle: issue.fields.status?.name,
       updatedAt: issue.fields.updated

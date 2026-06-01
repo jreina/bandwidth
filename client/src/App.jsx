@@ -24,11 +24,16 @@ export default function App() {
   const [errors, setErrors] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [spotlightProject, setSpotlightProject] = useState(null);
+  const [repos, setRepos] = useState([]);
 
   useEffect(() => {
     fetch('/api/config')
       .then(r => r.json())
       .then(c => setSpotlightProject(c.spotlightProject || null))
+      .catch(() => {});
+    fetch('/api/repos')
+      .then(r => r.json())
+      .then(list => setRepos(Array.isArray(list) ? list : []))
       .catch(() => {});
   }, []);
 
@@ -53,19 +58,17 @@ export default function App() {
     setItems(allItems);
     setErrors(errs);
 
-    // Fetch worktree state for each unique repo that exists locally
-    const repoNames = [...new Set(allItems.filter(i => i.repoName).map(i => i.repoName))];
+    // Fetch all worktrees across all repos in one call
     const wtMap = {};
-    await Promise.all(repoNames.map(async repoName => {
-      try {
-        const res = await fetch(`/api/worktrees/${repoName}`);
-        if (!res.ok) return;
+    try {
+      const res = await fetch('/api/worktrees');
+      if (res.ok) {
         const wts = await res.json();
         for (const wt of wts) {
-          if (wt.branch) wtMap[`${repoName}/${wt.branch}`] = wt;
+          if (wt.branch && wt.repoName) wtMap[`${wt.repoName}/${wt.branch}`] = wt;
         }
-      } catch {}
-    }));
+      }
+    } catch {}
     setWorktrees(wtMap);
     setLoading(false);
     setRefreshing(false);
@@ -73,31 +76,35 @@ export default function App() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  async function handleCreateWorktree(item) {
+  async function handleCreateWorktree(item, override = {}) {
+    const repoName = override.repoName || item.repoName;
+    const branch = override.branch || item.branch;
     const res = await fetch('/api/worktrees', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ repoName: item.repoName, branch: item.branch })
+      body: JSON.stringify({ repoName, branch })
     });
     const data = await res.json();
     if (data.path) {
       setWorktrees(prev => ({
         ...prev,
-        [`${item.repoName}/${item.branch}`]: { path: data.path, branch: item.branch }
+        [`${repoName}/${branch}`]: { path: data.path, branch, repoName }
       }));
     }
-    return data;
+    return { ...data, repoName, branch };
   }
 
-  async function handleRemoveWorktree(item) {
+  async function handleRemoveWorktree(item, override = {}) {
+    const repoName = override.repoName || item.repoName;
+    const branch = override.branch || item.branch;
     await fetch('/api/worktrees', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ repoName: item.repoName, branch: item.branch })
+      body: JSON.stringify({ repoName, branch })
     });
     setWorktrees(prev => {
       const next = { ...prev };
-      delete next[`${item.repoName}/${item.branch}`];
+      delete next[`${repoName}/${branch}`];
       return next;
     });
   }
@@ -113,6 +120,35 @@ export default function App() {
     items: filteredItems.filter(i => i.category === cat.id)
   }));
   const totalVisible = filteredItems.length;
+
+  // Orphan worktrees: on disk but no active item references them
+  const activeKeys = new Set(
+    items.filter(i => i.repoName && i.branch).map(i => `${i.repoName}/${i.branch}`)
+  );
+  const orphanWorktrees = Object.entries(worktrees)
+    .filter(([key]) => !activeKeys.has(key))
+    .map(([key, wt]) => ({ key, ...wt }));
+
+  async function handleRemoveOrphan(wt) {
+    await fetch('/api/worktrees', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repoName: wt.repoName, branch: wt.branch })
+    });
+    setWorktrees(prev => {
+      const next = { ...prev };
+      delete next[wt.key];
+      return next;
+    });
+  }
+
+  async function handleOpenOrphan(wt) {
+    await fetch('/api/worktrees/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: wt.path })
+    });
+  }
 
   return (
     <div className="app">
@@ -151,17 +187,56 @@ export default function App() {
             <span className="spin">↺</span> Loading your work items…
           </div>
         ) : (
-          <div className="categories-grid">
-            {grouped.map(cat => (
-              <WorkCategory
-                key={cat.id}
-                category={cat}
-                worktrees={worktrees}
-                onCreateWorktree={handleCreateWorktree}
-                onRemoveWorktree={handleRemoveWorktree}
-              />
-            ))}
-          </div>
+          <>
+            <div className="categories-grid">
+              {grouped.map(cat => (
+                <WorkCategory
+                  key={cat.id}
+                  category={cat}
+                  worktrees={worktrees}
+                  repos={repos}
+                  onCreateWorktree={handleCreateWorktree}
+                  onRemoveWorktree={handleRemoveWorktree}
+                />
+              ))}
+            </div>
+            {orphanWorktrees.length > 0 && (
+              <section className="orphan-section">
+                <h2 className="orphan-title">
+                  Stale worktrees
+                  <span className="orphan-count">{orphanWorktrees.length}</span>
+                </h2>
+                <p className="orphan-hint">
+                  These worktrees exist on disk but no longer match an active PR or issue.
+                </p>
+                <ul className="orphan-list">
+                  {orphanWorktrees.map(wt => (
+                    <li key={wt.key} className="orphan-item">
+                      <div className="orphan-info">
+                        <span className="orphan-repo">{wt.repoName}</span>
+                        <span className="orphan-branch">{wt.branch}</span>
+                        <code className="orphan-path">{wt.path}</code>
+                      </div>
+                      <div className="orphan-actions">
+                        <button
+                          className="worktree-btn open"
+                          onClick={() => handleOpenOrphan(wt)}
+                        >
+                          Open in Code
+                        </button>
+                        <button
+                          className="worktree-btn remove"
+                          onClick={() => handleRemoveOrphan(wt)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </>
         )}
       </main>
     </div>

@@ -327,3 +327,131 @@ h1 {
 }
 .worktree-btn.open:hover { background: rgba(16,185,129,0.15); border-color: #10b981; }
 .worktree-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Repo picker (Jira items) ── */
+.repo-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.repo-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.repo-picker-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.repo-picker-select {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.35rem;
+  background: var(--surface-2, var(--surface));
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.repo-picker-branch {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+  word-break: break-all;
+  display: block;
+}
+
+/* ── Orphan worktrees ── */
+.orphan-section {
+  margin-top: 2rem;
+  padding: 1rem 1.125rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.orphan-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.25rem;
+}
+
+.orphan-count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  min-width: 22px;
+  text-align: center;
+}
+
+.orphan-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.orphan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+.orphan-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.orphan-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.orphan-repo {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text);
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+}
+
+.orphan-branch {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+}
+
+.orphan-path {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+  word-break: break-all;
+}
+
+.orphan-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}

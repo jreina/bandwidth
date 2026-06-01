@@ -1,7 +1,15 @@
 import { Router } from 'express';
-import { listWorktrees, createWorktree, removeWorktree, openInCode } from '../services/git.js';
+import { listWorktrees, listAllWorktrees, createWorktree, removeWorktree, openInCode } from '../services/git.js';
 
 const router = Router();
+
+router.get('/', async (_req, res) => {
+  try {
+    res.json(await listAllWorktrees());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 router.get('/:repoName', async (req, res) => {
   try {

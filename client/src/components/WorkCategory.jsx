@@ -1,6 +1,6 @@
 import WorkItem from './WorkItem.jsx';
 
-export default function WorkCategory({ category, worktrees, onCreateWorktree, onRemoveWorktree }) {
+export default function WorkCategory({ category, worktrees, repos, onCreateWorktree, onRemoveWorktree }) {
   return (
     <div className="work-category" style={{ '--cat-color': category.color }}>
       <div className="category-header">
@@ -16,6 +16,7 @@ export default function WorkCategory({ category, worktrees, onCreateWorktree, on
               key={item.id}
               item={item}
               worktree={item.branch ? worktrees[`${item.repoName}/${item.branch}`] ?? null : null}
+              repos={repos}
               onCreateWorktree={onCreateWorktree}
               onRemoveWorktree={onRemoveWorktree}
             />

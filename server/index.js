@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import githubRoutes from './routes/github.js';
 import jiraRoutes from './routes/jira.js';
 import worktreeRoutes from './routes/worktrees.js';
+import repoRoutes from './routes/repos.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, '../.env') });
@@ -23,6 +24,7 @@ app.get('/api/config', (_, res) => res.json({
 app.use('/api/github', githubRoutes);
 app.use('/api/jira', jiraRoutes);
 app.use('/api/worktrees', worktreeRoutes);
+app.use('/api/repos', repoRoutes);
 
 app.listen(PORT, () => {
   console.log(`bandwidth server → http://localhost:${PORT}`);

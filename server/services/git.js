@@ -2,7 +2,7 @@ import simpleGit from 'simple-git';
 import { spawn } from 'child_process';
 import { join } from 'path';
 import { homedir } from 'os';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 
 function resolveBase() {
   const base = process.env.LOCAL_REPO_BASE || '~/development';
@@ -35,6 +35,31 @@ function parseWorktreeList(output) {
   return worktrees;
 }
 
+export async function listAllWorktrees() {
+  const base = resolveBase();
+  if (!existsSync(base)) return [];
+  let entries;
+  try {
+    entries = readdirSync(base, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const repoNames = entries
+    .filter(e => e.isDirectory() && e.name.endsWith('-worktrees'))
+    .map(e => e.name.slice(0, -'-worktrees'.length))
+    .filter(name => existsSync(getRepoPath(name)));
+
+  const results = await Promise.all(repoNames.map(async repoName => {
+    const wts = await listWorktrees(repoName);
+    return wts.map(wt => ({ ...wt, repoName }));
+  }));
+  // The main repo checkout shows up in `git worktree list` too — filter it out
+  // so only actual added worktrees (those under {repoName}-worktrees/) remain.
+  return results.flat().filter(wt =>
+    wt.path.includes(`${wt.repoName}-worktrees`)
+  );
+}
+
 export async function listWorktrees(repoName) {
   const repoPath = getRepoPath(repoName);
   if (!existsSync(repoPath)) return [];
@@ -56,15 +81,64 @@ export async function createWorktree(repoName, branch) {
   const worktreePath = getWorktreePath(repoName, branch);
   const git = simpleGit(repoPath);
 
-  // Fetch branch from origin so it exists locally
+  // Refresh remote-tracking refs so we can detect origin/{branch}
   try {
-    await git.raw(['fetch', 'origin', `${branch}:${branch}`]);
-  } catch {
-    // Branch may already exist locally — continue
-  }
+    await git.raw(['fetch', 'origin']);
+  } catch {}
 
-  await git.raw(['worktree', 'add', worktreePath, branch]);
+  const hasLocal = (await git.raw(['branch', '--list', branch])).trim().length > 0;
+  const hasRemote = (await git.raw(['branch', '-r', '--list', `origin/${branch}`])).trim().length > 0;
+
+  if (hasLocal) {
+    await git.raw(['worktree', 'add', worktreePath, branch]);
+  } else if (hasRemote) {
+    await git.raw(['worktree', 'add', '--track', '-b', branch, worktreePath, `origin/${branch}`]);
+  } else {
+    await git.raw(['worktree', 'add', '-b', branch, worktreePath]);
+  }
   return worktreePath;
+}
+
+export function listLocalRepos() {
+  const base = resolveBase();
+  if (!existsSync(base)) return [];
+  let entries;
+  try {
+    entries = readdirSync(base, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter(e => e.isDirectory() && !e.name.endsWith('-worktrees'))
+    .map(e => e.name)
+    .filter(name => existsSync(join(resolveBase(), name, '.git')));
+}
+
+export async function listAllBranchesAcrossRepos() {
+  const repos = listLocalRepos();
+  const result = {};
+  await Promise.all(repos.map(async repoName => {
+    const repoPath = getRepoPath(repoName);
+    try {
+      const git = simpleGit(repoPath);
+      const out = await git.raw([
+        'for-each-ref',
+        '--format=%(refname:short)',
+        'refs/heads/',
+        'refs/remotes/origin/'
+      ]);
+      const branches = new Set();
+      for (const raw of out.trim().split('\n')) {
+        const name = raw.trim();
+        if (!name || name.endsWith('/HEAD')) continue;
+        branches.add(name.replace(/^origin\//, ''));
+      }
+      result[repoName] = [...branches];
+    } catch {
+      result[repoName] = [];
+    }
+  }));
+  return result;
 }
 
 export async function removeWorktree(repoName, branch) {
