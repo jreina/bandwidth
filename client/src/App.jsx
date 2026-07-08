@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import EnergySelector from './components/EnergySelector.jsx';
 import WorkCategory from './components/WorkCategory.jsx';
+import NewWorktree from './components/NewWorktree.jsx';
 
 const BASE_CATEGORIES = [
   { id: 'code-review', label: 'Code Review', color: '#3b82f6' },
@@ -92,6 +93,10 @@ export default function App() {
       }));
     }
     return { ...data, repoName, branch };
+  }
+
+  function handleCreateAdHocWorktree(branch, repoName) {
+    return handleCreateWorktree({}, { repoName, branch });
   }
 
   async function handleRemoveWorktree(item, override = {}) {
@@ -188,6 +193,7 @@ export default function App() {
           </div>
         ) : (
           <>
+            <NewWorktree repos={repos} onCreate={handleCreateAdHocWorktree} />
             <div className="categories-grid">
               {grouped.map(cat => (
                 <WorkCategory

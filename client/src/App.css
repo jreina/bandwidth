@@ -365,6 +365,125 @@ h1 {
   display: block;
 }
 
+/* ── New worktree ── */
+.new-worktree {
+  margin-bottom: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.new-worktree-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1.125rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  transition: color 0.15s;
+}
+.new-worktree-toggle:hover { color: var(--text); }
+
+.new-worktree-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.new-worktree-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.new-worktree-body {
+  padding: 0 1.125rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.new-worktree-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.new-worktree-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  width: 48px;
+}
+
+.new-worktree-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  max-width: 340px;
+  display: flex;
+}
+
+.new-worktree-select,
+.new-worktree-input {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--surface-2, var(--bg));
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-width: 0;
+}
+.new-worktree-select {
+  flex: 1;
+  max-width: 340px;
+}
+.new-worktree-input {
+  flex: 1;
+  padding-right: 1.75rem;
+}
+.new-worktree-input::placeholder { color: var(--text-dim); }
+
+.new-worktree-clear {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 1rem;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+}
+.new-worktree-clear:hover { color: var(--text); background: var(--surface-hover); }
+
 /* ── Orphan worktrees ── */
 .orphan-section {
   margin-top: 2rem;
