@@ -26,16 +26,9 @@ This is a two-process app: an Express server (`server/`) and a React+Vite client
 
 1. On load, the client fetches `/api/config` and `/api/repos` in parallel, then `/api/github/items` and `/api/jira/items`.
 2. It then fetches `/api/worktrees` (a single call that lists worktrees across every repo under `LOCAL_REPO_BASE`) to hydrate worktree status.
-3. `buildInFlight()` (`client/src/inFlight.js`) pulls already-started work out of the categories into an **In flight** lane at the top: your open PRs, Jira issues whose status category is "In Progress", any item with a worktree, and ad-hoc worktrees with uncommitted changes. Entries carry signals (PR state, CI, conflicts, uncommitted files, last activity) and are sorted actionable-first, then most neglected. Entries idle more than 7 days are flagged as stalled; entries idle more than 90 days are collapsed under "dormant". The energy filter never hides in-flight work.
-4. The remaining items are categorized and filtered client-side based on the selected energy level.
+3. `buildInFlight()` (`client/src/inFlight.js`) pulls already-started work out of the categories into an **In flight** lane at the top: your open PRs, Jira issues whose status category is "In Progress", any item with a worktree, and ad-hoc worktrees with uncommitted changes. Entries carry signals (PR state, CI, conflicts, uncommitted files, last activity) and are sorted actionable-first, then most neglected. Entries idle more than 7 days are flagged as stalled; entries idle more than 90 days are collapsed under "dormant".
+4. The remaining items are sorted by `byUrgency()` (`client/src/urgency.js`: review requests first, then Jira priority, then oldest first) and grouped into category columns. Nothing is filtered out.
 5. Clean worktrees on disk whose branch doesn't match any item are shown in a "Stale worktrees" section under the categories grid.
-
-### Energy filter
-
-Each item has an `effort` field (`small` | `medium` | `large`). The energy selector controls which efforts are visible:
-- **Low** → small only
-- **Medium** → small + medium
-- **High** → all
 
 ### Work item shape
 
@@ -44,17 +37,20 @@ Each item has an `effort` field (`small` | `medium` | `large`). The energy selec
   id, title, description, url,
   source: 'github-pr' | 'github-issue' | 'jira',
   category: 'code-review' | 'bug' | 'task' | 'docs' | <spotlightProject.toLowerCase()>,
-  effort: 'small' | 'medium' | 'large',
+  effort: 'small' | 'medium' | 'large',  // shown as a badge only
   repo,        // "owner/repo-name" (GitHub) or just "repo-name" (Jira auto-match)
   repoName,    // just "repo-name" — used for worktree API calls
   branch,      // PR head ref (GitHub PR) or matched local branch (Jira); null otherwise
   subtitle,    // "Review requested" / "Changes requested" / Jira status name
+  createdAt,   // used as "waiting since" for urgency sorting
+  updatedAt,
 
   // Jira-only fields:
   suggestedBranch, // `{KEY}-{slug-of-summary}` — used when no local branch matches
   branchMatches,   // [{ repoName, branch }] — every local branch whose name contains the Jira key
   projectKey,      // e.g. "SOC" — used by the client to remember repo picks per-project
   inProgress,      // status category is "In Progress"
+  priority,        // Jira priority name, e.g. "High"
 
   // GitHub PR-only fields:
   role,            // 'reviewer' | 'author'

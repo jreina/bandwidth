@@ -9,7 +9,7 @@ export default function WorkCategory({ category, worktrees, repos, onCreateWorkt
       </div>
       <div className="category-items">
         {category.items.length === 0 ? (
-          <div className="empty-state">Nothing here at this energy level</div>
+          <div className="empty-state">Nothing here</div>
         ) : (
           category.items.map(item => (
             <WorkItem

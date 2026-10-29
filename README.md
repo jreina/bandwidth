@@ -1,6 +1,6 @@
 # bandwidth
 
-A personal dashboard that asks *"what do you have energy to work on?"* — pulls your open GitHub PRs, review requests, and Jira tickets into one view, filtered by how much focus you have right now.
+A personal dashboard that shows *what needs you*: it pulls your open GitHub PRs, review requests, and Jira tickets into one view, with work you've already started pinned at the top so it doesn't get forgotten.
 
 This was not my original idea and I definitely stole it from [Scott Hanselman](https://github.com/shanselman). This is also 100% vibe coded so use at your own risk.
 
@@ -44,12 +44,9 @@ GitHub auth is handled entirely by the `gh` CLI — no token needed in `.env`.
 
 ## How it works
 
-**Energy selector** — choose Low, Medium, or High. This filters items by estimated effort:
-- Low → small items only (PRs under 100 lines, Jira tickets ≤ 2 points)
-- Medium → small + medium
-- High → everything
+**In flight** — work you've already started sits in its own lane at the top: your open PRs, Jira tickets in an "In Progress" status, anything with a worktree, and local worktrees with uncommitted changes. Each card shows PR state, CI failures, merge conflicts, uncommitted files, and time since last activity. Actionable items (conflicts, failing CI, requested changes, approved-and-ready-to-merge) sort first, then the most neglected. Anything idle over 7 days is flagged as stalled, and anything idle over 90 days is collapsed under "dormant".
 
-**Categories** — items are bucketed into Code Review, Bugs, Tasks, and Docs based on PR labels and Jira issue types. If `JIRA_SPOTLIGHT_PROJECT` is set, that project gets its own column.
+**Categories** — everything else is sorted by urgency (review requests first since someone is blocked on you, then Jira priority, then oldest first) and bucketed into Code Review, Bugs, Tasks, and Docs based on PR labels and Jira issue types. If `JIRA_SPOTLIGHT_PROJECT` is set, that project gets its own column.
 
 **Git worktrees** — GitHub PRs have a "Create worktree" button. Clicking it runs `git worktree add` so you can context-switch between tasks without stashing. The worktree path is shown on the card; "Remove worktree" cleans it up. "Open in Code" launches VS Code on the worktree. Worktrees are created at `{LOCAL_REPO_BASE}/{repo-name}-worktrees/{branch-name}`.
 

@@ -121,6 +121,7 @@ export async function getGitHubItems() {
       checks,
       conflicts: pr.mergeable_state === 'dirty',
       subtitle: isReviewer ? 'Review requested' : AUTHORED_SUBTITLES[prState],
+      createdAt: pr.created_at,
       updatedAt: pr.updated_at
     });
   }
@@ -141,6 +142,7 @@ export async function getGitHubItems() {
       repoName: r.repo,
       branch: null,
       number: issue.number,
+      createdAt: issue.created_at,
       updatedAt: issue.updated_at
     });
   }

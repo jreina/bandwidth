@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import './App.css';
-import EnergySelector from './components/EnergySelector.jsx';
 import WorkCategory from './components/WorkCategory.jsx';
 import NewWorktree from './components/NewWorktree.jsx';
 import InFlight from './components/InFlight.jsx';
 import { buildInFlight } from './inFlight.js';
+import { byUrgency } from './urgency.js';
 
 const BASE_CATEGORIES = [
   { id: 'code-review', label: 'Code Review', color: '#3b82f6' },
@@ -13,16 +13,9 @@ const BASE_CATEGORIES = [
   { id: 'docs',        label: 'Docs',        color: '#8b5cf6' }
 ];
 
-const EFFORT_BY_ENERGY = {
-  low:    ['small'],
-  medium: ['small', 'medium'],
-  high:   ['small', 'medium', 'large']
-};
-
 export default function App() {
   const [items, setItems] = useState([]);
   const [worktrees, setWorktrees] = useState({});
-  const [energy, setEnergy] = useState('medium');
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -120,17 +113,13 @@ export default function App() {
     ? [...BASE_CATEGORIES, { id: spotlightProject.toLowerCase(), label: spotlightProject, color: '#f97316' }]
     : BASE_CATEGORIES;
 
-  // In-flight work is pulled out of the categories and never hidden by energy
+  // In-flight work is pulled out of the categories into its own lane
   const inFlight = buildInFlight(items, worktrees);
-  const queuedItems = items.filter(i => !inFlight.itemIds.has(i.id));
-
-  const allowedEfforts = EFFORT_BY_ENERGY[energy];
-  const filteredItems = queuedItems.filter(i => allowedEfforts.includes(i.effort));
+  const queuedItems = items.filter(i => !inFlight.itemIds.has(i.id)).sort(byUrgency);
   const grouped = categories.map(cat => ({
     ...cat,
-    items: filteredItems.filter(i => i.category === cat.id)
+    items: queuedItems.filter(i => i.category === cat.id)
   }));
-  const totalVisible = filteredItems.length;
 
   // Orphan worktrees: on disk but no active item references them
   const activeKeys = new Set(
@@ -166,11 +155,10 @@ export default function App() {
       <header className="app-header">
         <div className="header-top">
           <div>
-            <h1>What do you have energy to work on?</h1>
+            <h1>What needs you</h1>
             {!loading && (
               <p className="item-count">
-                {totalVisible} item{totalVisible !== 1 ? 's' : ''} at this energy level
-                {queuedItems.length > totalVisible && ` · ${queuedItems.length - totalVisible} hidden`}
+                {inFlight.entries.length} in flight · {queuedItems.length} queued
               </p>
             )}
           </div>
@@ -184,7 +172,6 @@ export default function App() {
             <span className={refreshing ? 'spin' : ''}>↺</span>
           </button>
         </div>
-        <EnergySelector value={energy} onChange={setEnergy} />
         {errors.length > 0 && (
           <div className="fetch-errors">
             {errors.map(e => <span key={e} className="fetch-error">{e}</span>)}

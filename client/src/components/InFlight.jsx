@@ -28,7 +28,7 @@ export default function InFlight({ entries, dormant, repos, onCreateWorktree, on
         {staleCount > 0 && <span className="in-flight-stale">{staleCount} stalled</span>}
       </h2>
       <p className="in-flight-hint">
-        Work you've already started. Always shown, whatever your energy level.
+        Work you've already started, actionable and most neglected first.
       </p>
       {entries.length > 0 && (
         <div className="in-flight-grid">{entries.map(renderEntry)}</div>

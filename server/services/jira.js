@@ -31,7 +31,7 @@ export async function getJiraItems() {
     : '';
   const jql = `assignee = currentUser() AND status not in (Done, Closed, Resolved)${projectClause} ORDER BY updated DESC`;
 
-  const url = `https://${JIRA_HOST}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,description,issuetype,priority,status,labels,customfield_10016,updated`;
+  const url = `https://${JIRA_HOST}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=50&fields=summary,description,issuetype,priority,status,labels,customfield_10016,updated,created`;
 
   let res;
   try {
@@ -98,6 +98,8 @@ export async function getJiraItems() {
       key: issue.key,
       subtitle: issue.fields.status?.name,
       inProgress: issue.fields.status?.statusCategory?.key === 'indeterminate',
+      priority: issue.fields.priority?.name ?? null,
+      createdAt: issue.fields.created,
       updatedAt: issue.fields.updated
     };
   });

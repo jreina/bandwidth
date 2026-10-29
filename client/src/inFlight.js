@@ -11,7 +11,7 @@ const PR_STATE_SIGNALS = {
   'draft':             { label: 'Draft', tone: 'muted' }
 };
 
-function ageLabel(ms) {
+export function ageLabel(ms) {
   if (ms >= 365 * DAY) return `${Math.floor(ms / (365 * DAY))}y ago`;
   if (ms >= DAY) return `${Math.floor(ms / DAY)}d ago`;
   if (ms >= HOUR) return `${Math.floor(ms / HOUR)}h ago`;

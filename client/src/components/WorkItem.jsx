@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { ageLabel } from '../inFlight.js';
+import { priorityRank, waitingSince } from '../urgency.js';
 
 const SOURCE_LABELS = {
   'github-pr':    'PR',
@@ -107,6 +109,10 @@ export default function WorkItem({ item, worktree, signals = [], stale = false, 
       <div className="item-badges">
         <span className="badge badge-source">{SOURCE_LABELS[item.source] ?? item.source}</span>
         {item.effort && <span className={`badge badge-effort ${item.effort}`}>{item.effort}</span>}
+        {priorityRank(item) <= 1 && <span className="badge badge-priority">{item.priority}</span>}
+        {item.role === 'reviewer' && waitingSince(item) && (
+          <span className="badge badge-waiting">waiting {ageLabel(Date.now() - waitingSince(item)).replace(' ago', '')}</span>
+        )}
       </div>
 
       {item.url ? (
