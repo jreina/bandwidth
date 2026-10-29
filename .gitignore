@@ -143,3 +143,6 @@ vite.config.ts.timestamp-*
 .vite/
 
 .DS_Store
+
+# Local personal state (notes, pins, snoozes, commitments)
+server/data/

@@ -18,13 +18,45 @@ export function ageLabel(ms) {
   return 'just now';
 }
 
+export function isSnoozed(annotation, now = Date.now()) {
+  const until = Date.parse(annotation?.snoozedUntil);
+  return !Number.isNaN(until) && until > now;
+}
+
+// dueDate is a local calendar date ("YYYY-MM-DD") from a date input
+function dueSignal(dueDate, now) {
+  const due = new Date(`${dueDate}T00:00`);
+  if (Number.isNaN(due.getTime())) return null;
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((due - today) / DAY);
+  if (days < 0) return { label: `Overdue by ${-days}d`, tone: 'alert' };
+  if (days === 0) return { label: 'Due today', tone: 'warn' };
+  if (days === 1) return { label: 'Due tomorrow', tone: 'warn' };
+  return { label: `Due in ${days}d`, tone: 'muted' };
+}
+
+function commitmentItem(c) {
+  return {
+    id: c.id,
+    title: c.title,
+    source: 'commitment',
+    dueDate: c.dueDate,
+    createdAt: c.createdAt,
+    updatedAt: c.createdAt
+  };
+}
+
 function latestTimestamp(...isoStrings) {
   const times = isoStrings.map(s => Date.parse(s)).filter(t => !Number.isNaN(t));
   return times.length ? Math.max(...times) : null;
 }
 
-function describe(item, worktree, now) {
+function describe(item, worktree, annotation, now) {
   const signals = [];
+
+  const due = item.dueDate && dueSignal(item.dueDate, now);
+  if (due) signals.push(due);
 
   const prSignal = PR_STATE_SIGNALS[item.prState];
   if (prSignal) signals.push(prSignal);
@@ -37,39 +69,57 @@ function describe(item, worktree, now) {
     signals.push({ label: `${n} uncommitted file${n !== 1 ? 's' : ''}`, tone: 'warn' });
   }
 
-  const lastTouched = latestTimestamp(item.updatedAt, worktree?.lastCommitAt, worktree?.lastEditAt);
+  const lastTouched = latestTimestamp(
+    item.updatedAt, worktree?.lastCommitAt, worktree?.lastEditAt, annotation?.updatedAt
+  );
   const idleMs = lastTouched ? now - lastTouched : null;
   const stale = idleMs !== null && idleMs > STALE_AFTER_DAYS * DAY;
   if (idleMs !== null) {
     signals.push({ label: `Last activity ${ageLabel(idleMs)}`, tone: stale ? 'warn' : 'muted' });
   }
 
-  // Something you can act on right now: fix feedback/CI/conflicts, or merge
+  // Something you can act on right now: fix feedback/CI/conflicts, overdue, or merge
   const needsAction = signals.some(s => s.tone === 'alert' || s.tone === 'good');
-  const dormant = idleMs !== null && idleMs > DORMANT_AFTER_DAYS * DAY;
-  return { item, worktree, signals, needsAction, stale, dormant, idleMs };
+  const pinned = !!annotation?.pinned;
+  // Things you've explicitly committed to never drift into the dormant pile
+  const dormant = !pinned && item.source !== 'commitment' &&
+    idleMs !== null && idleMs > DORMANT_AFTER_DAYS * DAY;
+  return { item, worktree, annotation, signals, needsAction, pinned, stale, dormant, idleMs };
 }
 
-// Work you've already started: your open PRs, Jira issues in an in-progress
-// status, anything with a worktree, and ad-hoc worktrees with uncommitted changes.
-export function buildInFlight(items, worktrees, now = Date.now()) {
+// Work you've already started or committed to: pinned items, your commitments,
+// your open PRs, Jira issues in an in-progress status, anything with a worktree,
+// and ad-hoc worktrees with uncommitted changes. Snoozed items are set aside.
+export function buildInFlight(items, worktrees, { annotations = {}, commitments = [] } = {}, now = Date.now()) {
   const entries = [];
-  const itemIds = new Set();
-  const worktreeKeys = new Set();
+  const snoozed = [];
+  const itemIds = new Set();     // handled here (in flight or snoozed) — kept out of the categories
+  const worktreeKeys = new Set(); // claimed worktrees — kept out of "stale worktrees"
+
+  function consider(item, worktree, startedWork) {
+    const annotation = annotations[item.id];
+    if (isSnoozed(annotation, now)) {
+      itemIds.add(item.id);
+      snoozed.push({ item, worktree, annotation });
+    } else if (startedWork || annotation?.pinned) {
+      itemIds.add(item.id);
+      entries.push(describe(item, worktree, annotation, now));
+    }
+  }
+
+  for (const c of commitments) consider(commitmentItem(c), null, true);
 
   for (const item of items) {
     const key = item.repoName && item.branch ? `${item.repoName}/${item.branch}` : null;
     const worktree = key ? worktrees[key] : null;
-    if (!(item.role === 'author' || item.inProgress || worktree)) continue;
-    itemIds.add(item.id);
     if (worktree) worktreeKeys.add(key);
-    entries.push(describe(item, worktree, now));
+    consider(item, worktree, item.role === 'author' || item.inProgress || !!worktree);
   }
 
   for (const [key, wt] of Object.entries(worktrees)) {
     if (worktreeKeys.has(key) || !wt.dirtyCount) continue;
     worktreeKeys.add(key);
-    entries.push(describe({
+    consider({
       id: `worktree-${key}`,
       title: wt.branch,
       source: 'worktree',
@@ -77,19 +127,23 @@ export function buildInFlight(items, worktrees, now = Date.now()) {
       repoName: wt.repoName,
       branch: wt.branch,
       subtitle: 'Local work with no matching PR or ticket'
-    }, wt, now));
+    }, wt, true);
   }
 
-  // Actionable first, then the longest-neglected
+  // Pinned first, then actionable, then the longest-neglected
   entries.sort((a, b) =>
+    (b.pinned - a.pinned) ||
     (b.needsAction - a.needsAction) ||
     (b.stale - a.stale) ||
     ((b.idleMs ?? 0) - (a.idleMs ?? 0))
   );
+  // Soonest to wake up first
+  snoozed.sort((a, b) => Date.parse(a.annotation.snoozedUntil) - Date.parse(b.annotation.snoozedUntil));
 
   return {
     entries: entries.filter(e => !e.dormant),
     dormant: entries.filter(e => e.dormant),
+    snoozed,
     itemIds,
     worktreeKeys
   };

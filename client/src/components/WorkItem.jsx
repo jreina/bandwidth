@@ -1,13 +1,34 @@
-import { useState } from 'react';
-import { ageLabel } from '../inFlight.js';
+import { useState, useRef } from 'react';
+import { ageLabel, isSnoozed } from '../inFlight.js';
 import { priorityRank, waitingSince } from '../urgency.js';
 
 const SOURCE_LABELS = {
   'github-pr':    'PR',
   'github-issue': 'Issue',
   'jira':         'Jira',
-  'worktree':     'Local'
+  'worktree':     'Local',
+  'commitment':   'Commitment'
 };
+
+function at8am(daysFromNow) {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  d.setHours(8, 0, 0, 0);
+  return d.toISOString();
+}
+
+function snoozeOptions() {
+  const daysToMonday = ((8 - new Date().getDay()) % 7) || 7;
+  return [
+    { label: 'Tomorrow', until: at8am(1) },
+    { label: 'Next week', until: at8am(daysToMonday) },
+    { label: '2 weeks', until: at8am(14) }
+  ];
+}
+
+function formatDay(iso) {
+  return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
 
 const PROJECT_REPO_PREFIX = 'jiraProjectRepo:';
 
@@ -27,8 +48,16 @@ function rememberRepo(projectKey, repoName) {
   } catch {}
 }
 
-export default function WorkItem({ item, worktree, signals = [], stale = false, repos = [], onCreateWorktree, onRemoveWorktree }) {
+export default function WorkItem({
+  item, worktree, signals = [], stale = false, repos = [],
+  annotation, onAnnotate, onDone, onCreateWorktree, onRemoveWorktree
+}) {
   const [busy, setBusy] = useState(false);
+  const [editingNote, setEditingNote] = useState(false);
+  const cancelNoteRef = useRef(false);
+  const note = annotation?.note || '';
+  const pinned = !!annotation?.pinned;
+  const snoozed = isSnoozed(annotation);
   const [err, setErr] = useState(null);
   const [localWorktree, setLocalWorktree] = useState(undefined);
 
@@ -104,6 +133,17 @@ export default function WorkItem({ item, worktree, signals = [], stale = false, 
 
   const showWorktreeSection = !!item.branch || needsPicker;
 
+  function startEditingNote() {
+    cancelNoteRef.current = false;
+    setEditingNote(true);
+  }
+
+  function finishEditingNote(value) {
+    setEditingNote(false);
+    if (cancelNoteRef.current) return;
+    if (value.trim() !== note) onAnnotate(item, { note: value.trim() });
+  }
+
   return (
     <div className={`work-item ${activeWorktree ? 'has-worktree' : ''} ${stale ? 'is-stale' : ''}`}>
       <div className="item-badges">
@@ -138,6 +178,58 @@ export default function WorkItem({ item, worktree, signals = [], stale = false, 
       )}
 
       {item.repo && <span className="item-repo">{item.repo}</span>}
+
+      {editingNote ? (
+        <textarea
+          className="item-note-editor"
+          autoFocus
+          rows={2}
+          defaultValue={note}
+          placeholder="Where you left off, or the next step"
+          onBlur={e => finishEditingNote(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur(); }
+            if (e.key === 'Escape') { cancelNoteRef.current = true; e.currentTarget.blur(); }
+          }}
+        />
+      ) : note && (
+        <p className="item-note" onClick={onAnnotate ? startEditingNote : undefined}>{note}</p>
+      )}
+
+      {onAnnotate && (
+        <div className="item-actions">
+          <button
+            className={`item-action ${pinned ? 'active' : ''}`}
+            onClick={() => onAnnotate(item, { pinned: !pinned })}
+            title={pinned ? 'Unpin' : 'Pin to In flight'}
+          >
+            {pinned ? 'Pinned' : 'Pin'}
+          </button>
+          {snoozed ? (
+            <button className="item-action" onClick={() => onAnnotate(item, { snoozedUntil: null })}>
+              Wake (snoozed to {formatDay(annotation.snoozedUntil)})
+            </button>
+          ) : (
+            <select
+              className="item-action"
+              value=""
+              onChange={e => e.target.value && onAnnotate(item, { snoozedUntil: e.target.value })}
+              aria-label="Snooze"
+            >
+              <option value="">Snooze…</option>
+              {snoozeOptions().map(o => <option key={o.label} value={o.until}>{o.label}</option>)}
+            </select>
+          )}
+          {!editingNote && (
+            <button className="item-action" onClick={startEditingNote}>
+              {note ? 'Edit note' : 'Add note'}
+            </button>
+          )}
+          {onDone && (
+            <button className="item-action done" onClick={() => onDone(item)}>Done</button>
+          )}
+        </div>
+      )}
 
       {showWorktreeSection && (
         <div className="item-worktree">

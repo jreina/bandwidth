@@ -46,6 +46,13 @@ GitHub auth is handled entirely by the `gh` CLI — no token needed in `.env`.
 
 **In flight** — work you've already started sits in its own lane at the top: your open PRs, Jira tickets in an "In Progress" status, anything with a worktree, and local worktrees with uncommitted changes. Each card shows PR state, CI failures, merge conflicts, uncommitted files, and time since last activity. Actionable items (conflicts, failing CI, requested changes, approved-and-ready-to-merge) sort first, then the most neglected. Anything idle over 7 days is flagged as stalled, and anything idle over 90 days is collapsed under "dormant".
 
+**Notes, pins, snoozes and commitments** — every card has:
+- **Pin**: moves it into In flight, at the top. Use it for things you've promised.
+- **Snooze**: hides it until tomorrow, next Monday, or two weeks out, then it comes back on its own. Snoozed items are listed in a collapsed section at the bottom so they're never lost.
+- **Note**: where you left off, or the next step. Shown on the card.
+
+The **"I said I'd…"** box in In flight adds a commitment that has no ticket, with an optional due date. Overdue commitments sort to the top. Click **Done** when it's finished. All of this is stored locally in `server/data/state.json` (gitignored).
+
 **Categories** — everything else is sorted by urgency (review requests first since someone is blocked on you, then Jira priority, then oldest first) and bucketed into Code Review, Bugs, Tasks, and Docs based on PR labels and Jira issue types. If `JIRA_SPOTLIGHT_PROJECT` is set, that project gets its own column.
 
 **Git worktrees** — GitHub PRs have a "Create worktree" button. Clicking it runs `git worktree add` so you can context-switch between tasks without stashing. The worktree path is shown on the card; "Remove worktree" cleans it up. "Open in Code" launches VS Code on the worktree. Worktrees are created at `{LOCAL_REPO_BASE}/{repo-name}-worktrees/{branch-name}`.

@@ -24,9 +24,9 @@ This is a two-process app: an Express server (`server/`) and a React+Vite client
 
 ### Data flow
 
-1. On load, the client fetches `/api/config` and `/api/repos` in parallel, then `/api/github/items` and `/api/jira/items`.
+1. On load, the client fetches `/api/config` and `/api/repos` in parallel, then `/api/github/items`, `/api/jira/items` and `/api/state`.
 2. It then fetches `/api/worktrees` (a single call that lists worktrees across every repo under `LOCAL_REPO_BASE`) to hydrate worktree status.
-3. `buildInFlight()` (`client/src/inFlight.js`) pulls already-started work out of the categories into an **In flight** lane at the top: your open PRs, Jira issues whose status category is "In Progress", any item with a worktree, and ad-hoc worktrees with uncommitted changes. Entries carry signals (PR state, CI, conflicts, uncommitted files, last activity) and are sorted actionable-first, then most neglected. Entries idle more than 7 days are flagged as stalled; entries idle more than 90 days are collapsed under "dormant".
+3. `buildInFlight()` (`client/src/inFlight.js`) pulls already-started work out of the categories into an **In flight** lane at the top: pinned items, commitments, your open PRs, Jira issues whose status category is "In Progress", any item with a worktree, and ad-hoc worktrees with uncommitted changes. Snoozed items (from anywhere) go to a collapsed "Snoozed" section until their snooze ends. Entries carry signals (due date, PR state, CI, conflicts, uncommitted files, last activity) and are sorted pinned-first, then actionable, then most neglected. Pinned items and commitments never go dormant. Entries idle more than 7 days are flagged as stalled; entries idle more than 90 days are collapsed under "dormant".
 4. The remaining items are sorted by `byUrgency()` (`client/src/urgency.js`: review requests first, then Jira priority, then oldest first) and grouped into category columns. Nothing is filtered out.
 5. Clean worktrees on disk whose branch doesn't match any item are shown in a "Stale worktrees" section under the categories grid.
 
@@ -82,6 +82,14 @@ Other helpers in this module:
 - `listLocalRepos()` — returns the names of all git repos directly under `{LOCAL_REPO_BASE}`. Backs `GET /api/repos`.
 - `listAllBranchesAcrossRepos()` — `{ repoName: [branch, ...] }`, deduped and stripped of `origin/` prefix. Used by Jira auto-match.
 - `openInCode(path)` — launches VS Code via `open -a "Visual Studio Code"` with a minimal env (`HOME` + a stock `PATH`) so Launch Services starts it with the user's login env, not the dev server's nvm-modified one. Backs `POST /api/worktrees/open`.
+
+### Personal state
+
+`server/services/store.js` keeps what GitHub/Jira don't know in `server/data/state.json` (gitignored), served under `/api/state`:
+- `annotations: { [itemId]: { note, pinned, snoozedUntil, updatedAt } }`: any item can be annotated, including commitments and ad-hoc worktrees (`worktree-{repo}/{branch}`). `PUT /api/state/annotations` takes `{ id, ...patch }` (id goes in the body because it can contain slashes). `null` / `''` / `false` clear a field, and an annotation with no fields left is deleted. An annotation edit counts as activity for staleness.
+- `commitments: [{ id, title, dueDate, createdAt }]`: free-text promises with an optional local `YYYY-MM-DD` due date. `POST /api/state/commitments` adds one; `DELETE /api/state/commitments/:id` marks it done (removes it and its annotation).
+
+Writes are serialized through a promise queue and written atomically (tmp file + rename). A corrupt file errors instead of being reset.
 
 ## Environment
 

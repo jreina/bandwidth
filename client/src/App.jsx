@@ -3,6 +3,7 @@ import './App.css';
 import WorkCategory from './components/WorkCategory.jsx';
 import NewWorktree from './components/NewWorktree.jsx';
 import InFlight from './components/InFlight.jsx';
+import Snoozed from './components/Snoozed.jsx';
 import { buildInFlight } from './inFlight.js';
 import { byUrgency } from './urgency.js';
 
@@ -21,6 +22,8 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [spotlightProject, setSpotlightProject] = useState(null);
   const [repos, setRepos] = useState([]);
+  const [annotations, setAnnotations] = useState({});
+  const [commitments, setCommitments] = useState([]);
 
   useEffect(() => {
     fetch('/api/config')
@@ -37,10 +40,18 @@ export default function App() {
     setRefreshing(true);
     const errs = [];
 
-    const [githubRes, jiraRes] = await Promise.allSettled([
+    const [githubRes, jiraRes, stateRes] = await Promise.allSettled([
       fetch('/api/github/items').then(r => r.json()),
-      fetch('/api/jira/items').then(r => r.json())
+      fetch('/api/jira/items').then(r => r.json()),
+      fetch('/api/state').then(r => r.json())
     ]);
+
+    if (stateRes.status === 'fulfilled' && !stateRes.value.error) {
+      setAnnotations(stateRes.value.annotations || {});
+      setCommitments(stateRes.value.commitments || []);
+    } else {
+      errs.push('Notes: ' + (stateRes.reason?.message || stateRes.value?.error || 'failed'));
+    }
 
     const githubItems = githubRes.status === 'fulfilled' && Array.isArray(githubRes.value)
       ? githubRes.value
@@ -94,6 +105,46 @@ export default function App() {
     return handleCreateWorktree({}, { repoName, branch });
   }
 
+  async function handleAnnotate(item, patch) {
+    const res = await fetch('/api/state/annotations', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: item.id, ...patch })
+    });
+    const data = await res.json();
+    if (data.error) {
+      setErrors(prev => [...prev, 'Notes: ' + data.error]);
+      return;
+    }
+    setAnnotations(prev => {
+      const next = { ...prev };
+      if (data.annotation) next[item.id] = data.annotation;
+      else delete next[item.id];
+      return next;
+    });
+  }
+
+  async function handleAddCommitment(commitment) {
+    const res = await fetch('/api/state/commitments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(commitment)
+    });
+    const data = await res.json();
+    if (data.id) setCommitments(prev => [...prev, data]);
+    return data;
+  }
+
+  async function handleCompleteCommitment(item) {
+    await fetch(`/api/state/commitments/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+    setCommitments(prev => prev.filter(c => c.id !== item.id));
+    setAnnotations(prev => {
+      const next = { ...prev };
+      delete next[item.id];
+      return next;
+    });
+  }
+
   async function handleRemoveWorktree(item, override = {}) {
     const repoName = override.repoName || item.repoName;
     const branch = override.branch || item.branch;
@@ -114,7 +165,7 @@ export default function App() {
     : BASE_CATEGORIES;
 
   // In-flight work is pulled out of the categories into its own lane
-  const inFlight = buildInFlight(items, worktrees);
+  const inFlight = buildInFlight(items, worktrees, { annotations, commitments });
   const queuedItems = items.filter(i => !inFlight.itemIds.has(i.id)).sort(byUrgency);
   const grouped = categories.map(cat => ({
     ...cat,
@@ -190,6 +241,9 @@ export default function App() {
               entries={inFlight.entries}
               dormant={inFlight.dormant}
               repos={repos}
+              onAnnotate={handleAnnotate}
+              onAddCommitment={handleAddCommitment}
+              onCompleteCommitment={handleCompleteCommitment}
               onCreateWorktree={handleCreateWorktree}
               onRemoveWorktree={handleRemoveWorktree}
             />
@@ -201,11 +255,21 @@ export default function App() {
                   category={cat}
                   worktrees={worktrees}
                   repos={repos}
+                  annotations={annotations}
+                  onAnnotate={handleAnnotate}
                   onCreateWorktree={handleCreateWorktree}
                   onRemoveWorktree={handleRemoveWorktree}
                 />
               ))}
             </div>
+            <Snoozed
+              entries={inFlight.snoozed}
+              repos={repos}
+              onAnnotate={handleAnnotate}
+              onCompleteCommitment={handleCompleteCommitment}
+              onCreateWorktree={handleCreateWorktree}
+              onRemoveWorktree={handleRemoveWorktree}
+            />
             {orphanWorktrees.length > 0 && (
               <section className="orphan-section">
                 <h2 className="orphan-title">

@@ -641,3 +641,72 @@ h1 {
   color: #f59e0b;
   border: 1px solid rgba(245,158,11,0.3);
 }
+
+/* ── Notes, pins, snoozes, commitments ── */
+.item-note {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text);
+  margin: 0.4rem 0;
+  padding: 0.3rem 0.5rem;
+  border-left: 2px solid var(--accent);
+  background: var(--accent-dim);
+  border-radius: 0 4px 4px 0;
+  white-space: pre-wrap;
+  cursor: text;
+}
+
+.item-note-editor {
+  display: block;
+  width: 100%;
+  margin: 0.4rem 0;
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--surface-2, var(--bg));
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  resize: vertical;
+}
+.item-note-editor::placeholder { color: var(--text-dim); }
+
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.45rem;
+}
+
+.item-action {
+  font-size: 0.675rem;
+  padding: 0.15rem 0.45rem;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.item-action:hover { border-color: var(--border-hover); color: var(--text); }
+select.item-action { background: var(--bg); }
+.item-action.active { color: var(--accent); border-color: rgba(99,102,241,0.5); background: var(--accent-dim); }
+.item-action.done { color: #10b981; border-color: rgba(16,185,129,0.35); }
+.item-action.done:hover { background: rgba(16,185,129,0.12); }
+
+.commitment-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+.commitment-input { flex: 1 1 240px; max-width: 420px; padding-right: 0.5rem; }
+.commitment-date { flex: 0 0 auto; padding-right: 0.5rem; color-scheme: dark; }
+
+.snoozed-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
