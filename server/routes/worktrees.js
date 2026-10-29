@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { listWorktrees, listAllWorktrees, createWorktree, removeWorktree, openInCode } from '../services/git.js';
+import { attachClaudeSessions } from '../services/claude.js';
 
 const router = Router();
 
 router.get('/', async (_req, res) => {
   try {
-    res.json(await listAllWorktrees());
+    res.json(await attachClaudeSessions(await listAllWorktrees()));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

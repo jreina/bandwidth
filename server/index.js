@@ -8,6 +8,7 @@ import jiraRoutes from './routes/jira.js';
 import worktreeRoutes from './routes/worktrees.js';
 import repoRoutes from './routes/repos.js';
 import stateRoutes from './routes/state.js';
+import claudeRoutes from './routes/claude.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: resolve(__dirname, '../.env') });
@@ -27,6 +28,7 @@ app.use('/api/jira', jiraRoutes);
 app.use('/api/worktrees', worktreeRoutes);
 app.use('/api/repos', repoRoutes);
 app.use('/api/state', stateRoutes);
+app.use('/api/claude', claudeRoutes);
 
 app.listen(PORT, () => {
   console.log(`bandwidth server → http://localhost:${PORT}`);

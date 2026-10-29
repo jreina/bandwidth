@@ -64,13 +64,15 @@ function describe(item, worktree, annotation, now) {
   else if (item.checks === 'pending') signals.push({ label: 'CI running', tone: 'muted' });
   if (item.conflicts) signals.push({ label: 'Merge conflicts', tone: 'alert' });
   if (item.inProgress && item.subtitle) signals.push({ label: item.subtitle, tone: 'muted' });
+  if (worktree?.claudeRunning) signals.push({ label: 'Claude running', tone: 'live' });
   if (worktree?.dirtyCount) {
     const n = worktree.dirtyCount;
     signals.push({ label: `${n} uncommitted file${n !== 1 ? 's' : ''}`, tone: 'warn' });
   }
 
   const lastTouched = latestTimestamp(
-    item.updatedAt, worktree?.lastCommitAt, worktree?.lastEditAt, annotation?.updatedAt
+    item.updatedAt, worktree?.lastCommitAt, worktree?.lastEditAt, worktree?.lastSessionAt,
+    annotation?.updatedAt
   );
   const idleMs = lastTouched ? now - lastTouched : null;
   const stale = idleMs !== null && idleMs > STALE_AFTER_DAYS * DAY;
@@ -89,7 +91,8 @@ function describe(item, worktree, annotation, now) {
 
 // Work you've already started or committed to: pinned items, your commitments,
 // your open PRs, Jira issues in an in-progress status, anything with a worktree,
-// and ad-hoc worktrees with uncommitted changes. Snoozed items are set aside.
+// and ad-hoc worktrees with uncommitted changes or a running Claude session.
+// Snoozed items are set aside.
 export function buildInFlight(items, worktrees, { annotations = {}, commitments = [] } = {}, now = Date.now()) {
   const entries = [];
   const snoozed = [];
@@ -117,7 +120,7 @@ export function buildInFlight(items, worktrees, { annotations = {}, commitments 
   }
 
   for (const [key, wt] of Object.entries(worktrees)) {
-    if (worktreeKeys.has(key) || !wt.dirtyCount) continue;
+    if (worktreeKeys.has(key) || !(wt.dirtyCount || wt.claudeRunning)) continue;
     worktreeKeys.add(key);
     consider({
       id: `worktree-${key}`,

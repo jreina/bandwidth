@@ -28,7 +28,7 @@ This is a two-process app: an Express server (`server/`) and a React+Vite client
 2. It then fetches `/api/worktrees` (a single call that lists worktrees across every repo under `LOCAL_REPO_BASE`) to hydrate worktree status.
 3. `buildInFlight()` (`client/src/inFlight.js`) pulls already-started work out of the categories into an **In flight** lane at the top: pinned items, commitments, your open PRs, Jira issues whose status category is "In Progress", any item with a worktree, and ad-hoc worktrees with uncommitted changes. Snoozed items (from anywhere) go to a collapsed "Snoozed" section until their snooze ends. Entries carry signals (due date, PR state, CI, conflicts, uncommitted files, last activity) and are sorted pinned-first, then actionable, then most neglected. Pinned items and commitments never go dormant. Entries idle more than 7 days are flagged as stalled; entries idle more than 90 days are collapsed under "dormant".
 4. The remaining items are sorted by `byUrgency()` (`client/src/urgency.js`: review requests first, then Jira priority, then oldest first) and grouped into category columns. Nothing is filtered out.
-5. Clean worktrees on disk whose branch doesn't match any item are shown in a "Stale worktrees" section under the categories grid.
+5. Worktrees on disk with no uncommitted changes, no running Claude session, and no matching item are shown in a "Stale worktrees" section under the categories grid.
 
 ### Work item shape
 
@@ -82,6 +82,12 @@ Other helpers in this module:
 - `listLocalRepos()` — returns the names of all git repos directly under `{LOCAL_REPO_BASE}`. Backs `GET /api/repos`.
 - `listAllBranchesAcrossRepos()` — `{ repoName: [branch, ...] }`, deduped and stripped of `origin/` prefix. Used by Jira auto-match.
 - `openInCode(path)` — launches VS Code via `open -a "Visual Studio Code"` with a minimal env (`HOME` + a stock `PATH`) so Launch Services starts it with the user's login env, not the dev server's nvm-modified one. Backs `POST /api/worktrees/open`.
+
+### Claude Code sessions
+
+`server/services/claude.js` reads Claude Code's transcripts at `~/.claude/projects/*/{sessionId}.jsonl`. It reads only the first 64 KB (for `cwd` and first prompt) and the last 256 KB (for the latest `custom-title` / `ai-title` entry and last typed prompt), and caches the results by mtime and size. `GET /api/worktrees` runs through `attachClaudeSessions()`, which adds `claudeSessions` (newest first), `claudeRunning` and `lastSessionAt` to each worktree by matching session `cwd` to the worktree path. A worktree counts as running when `ps` + `lsof -d cwd` finds a `claude` process inside it; the process can't be tied to a session id, so the newest session there is the one marked `running`.
+
+`POST /api/claude/resume { sessionId }` validates the id as a UUID, looks the session up server-side (the client never sends a path or command), and runs `osascript` to open a Terminal.app window with `cd '{cwd}' && claude --resume {id}`.
 
 ### Personal state
 

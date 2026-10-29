@@ -4,6 +4,7 @@ import WorkCategory from './components/WorkCategory.jsx';
 import NewWorktree from './components/NewWorktree.jsx';
 import InFlight from './components/InFlight.jsx';
 import Snoozed from './components/Snoozed.jsx';
+import ClaudeSessions from './components/ClaudeSessions.jsx';
 import { buildInFlight } from './inFlight.js';
 import { byUrgency } from './urgency.js';
 
@@ -286,6 +287,7 @@ export default function App() {
                         <span className="orphan-repo">{wt.repoName}</span>
                         <span className="orphan-branch">{wt.branch}</span>
                         <code className="orphan-path">{wt.path}</code>
+                        <ClaudeSessions sessions={wt.claudeSessions} />
                       </div>
                       <div className="orphan-actions">
                         <button

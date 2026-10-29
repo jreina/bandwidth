@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { ageLabel, isSnoozed } from '../inFlight.js';
 import { priorityRank, waitingSince } from '../urgency.js';
+import ClaudeSessions from './ClaudeSessions.jsx';
 
 const SOURCE_LABELS = {
   'github-pr':    'PR',
@@ -239,6 +240,7 @@ export default function WorkItem({
               <code className="worktree-path">{activeWorktree.path}</code>
             </div>
           )}
+          {activeWorktree && <ClaudeSessions sessions={activeWorktree.claudeSessions} />}
           {needsPicker && !activeWorktree && (
             <div className="repo-picker">
               <div className="repo-picker-row">
