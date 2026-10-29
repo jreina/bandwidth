@@ -3,7 +3,8 @@ import { useState } from 'react';
 const SOURCE_LABELS = {
   'github-pr':    'PR',
   'github-issue': 'Issue',
-  'jira':         'Jira'
+  'jira':         'Jira',
+  'worktree':     'Local'
 };
 
 const PROJECT_REPO_PREFIX = 'jiraProjectRepo:';
@@ -24,7 +25,7 @@ function rememberRepo(projectKey, repoName) {
   } catch {}
 }
 
-export default function WorkItem({ item, worktree, repos = [], onCreateWorktree, onRemoveWorktree }) {
+export default function WorkItem({ item, worktree, signals = [], stale = false, repos = [], onCreateWorktree, onRemoveWorktree }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [localWorktree, setLocalWorktree] = useState(undefined);
@@ -102,17 +103,29 @@ export default function WorkItem({ item, worktree, repos = [], onCreateWorktree,
   const showWorktreeSection = !!item.branch || needsPicker;
 
   return (
-    <div className={`work-item ${activeWorktree ? 'has-worktree' : ''}`}>
+    <div className={`work-item ${activeWorktree ? 'has-worktree' : ''} ${stale ? 'is-stale' : ''}`}>
       <div className="item-badges">
         <span className="badge badge-source">{SOURCE_LABELS[item.source] ?? item.source}</span>
-        <span className={`badge badge-effort ${item.effort}`}>{item.effort}</span>
+        {item.effort && <span className={`badge badge-effort ${item.effort}`}>{item.effort}</span>}
       </div>
 
-      <a className="item-title" href={item.url} target="_blank" rel="noopener noreferrer">
-        {item.title}
-      </a>
+      {item.url ? (
+        <a className="item-title" href={item.url} target="_blank" rel="noopener noreferrer">
+          {item.title}
+        </a>
+      ) : (
+        <span className="item-title">{item.title}</span>
+      )}
 
-      {item.subtitle && <div className="item-subtitle">{item.subtitle}</div>}
+      {signals.length > 0 ? (
+        <div className="item-signals">
+          {signals.map(s => (
+            <span key={s.label} className={`signal signal-${s.tone}`}>{s.label}</span>
+          ))}
+        </div>
+      ) : (
+        item.subtitle && <div className="item-subtitle">{item.subtitle}</div>
+      )}
 
       {item.description && (
         <p className="item-description">{item.description}</p>

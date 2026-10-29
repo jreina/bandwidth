@@ -3,6 +3,8 @@ import './App.css';
 import EnergySelector from './components/EnergySelector.jsx';
 import WorkCategory from './components/WorkCategory.jsx';
 import NewWorktree from './components/NewWorktree.jsx';
+import InFlight from './components/InFlight.jsx';
+import { buildInFlight } from './inFlight.js';
 
 const BASE_CATEGORIES = [
   { id: 'code-review', label: 'Code Review', color: '#3b82f6' },
@@ -118,8 +120,12 @@ export default function App() {
     ? [...BASE_CATEGORIES, { id: spotlightProject.toLowerCase(), label: spotlightProject, color: '#f97316' }]
     : BASE_CATEGORIES;
 
+  // In-flight work is pulled out of the categories and never hidden by energy
+  const inFlight = buildInFlight(items, worktrees);
+  const queuedItems = items.filter(i => !inFlight.itemIds.has(i.id));
+
   const allowedEfforts = EFFORT_BY_ENERGY[energy];
-  const filteredItems = items.filter(i => allowedEfforts.includes(i.effort));
+  const filteredItems = queuedItems.filter(i => allowedEfforts.includes(i.effort));
   const grouped = categories.map(cat => ({
     ...cat,
     items: filteredItems.filter(i => i.category === cat.id)
@@ -131,7 +137,7 @@ export default function App() {
     items.filter(i => i.repoName && i.branch).map(i => `${i.repoName}/${i.branch}`)
   );
   const orphanWorktrees = Object.entries(worktrees)
-    .filter(([key]) => !activeKeys.has(key))
+    .filter(([key]) => !activeKeys.has(key) && !inFlight.worktreeKeys.has(key))
     .map(([key, wt]) => ({ key, ...wt }));
 
   async function handleRemoveOrphan(wt) {
@@ -164,7 +170,7 @@ export default function App() {
             {!loading && (
               <p className="item-count">
                 {totalVisible} item{totalVisible !== 1 ? 's' : ''} at this energy level
-                {items.length > totalVisible && ` · ${items.length - totalVisible} hidden`}
+                {queuedItems.length > totalVisible && ` · ${queuedItems.length - totalVisible} hidden`}
               </p>
             )}
           </div>
@@ -193,6 +199,13 @@ export default function App() {
           </div>
         ) : (
           <>
+            <InFlight
+              entries={inFlight.entries}
+              dormant={inFlight.dormant}
+              repos={repos}
+              onCreateWorktree={handleCreateWorktree}
+              onRemoveWorktree={handleRemoveWorktree}
+            />
             <NewWorktree repos={repos} onCreate={handleCreateAdHocWorktree} />
             <div className="categories-grid">
               {grouped.map(cat => (

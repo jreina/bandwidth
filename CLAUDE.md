@@ -26,8 +26,9 @@ This is a two-process app: an Express server (`server/`) and a React+Vite client
 
 1. On load, the client fetches `/api/config` and `/api/repos` in parallel, then `/api/github/items` and `/api/jira/items`.
 2. It then fetches `/api/worktrees` (a single call that lists worktrees across every repo under `LOCAL_REPO_BASE`) to hydrate worktree status.
-3. All items are categorized and filtered client-side based on the selected energy level.
-4. Worktrees on disk whose branch doesn't match any active item are shown in a "Stale worktrees" section under the categories grid.
+3. `buildInFlight()` (`client/src/inFlight.js`) pulls already-started work out of the categories into an **In flight** lane at the top: your open PRs, Jira issues whose status category is "In Progress", any item with a worktree, and ad-hoc worktrees with uncommitted changes. Entries carry signals (PR state, CI, conflicts, uncommitted files, last activity) and are sorted actionable-first, then most neglected. Entries idle more than 7 days are flagged as stalled; entries idle more than 90 days are collapsed under "dormant". The energy filter never hides in-flight work.
+4. The remaining items are categorized and filtered client-side based on the selected energy level.
+5. Clean worktrees on disk whose branch doesn't match any item are shown in a "Stale worktrees" section under the categories grid.
 
 ### Energy filter
 
@@ -53,12 +54,19 @@ Each item has an `effort` field (`small` | `medium` | `large`). The energy selec
   suggestedBranch, // `{KEY}-{slug-of-summary}` — used when no local branch matches
   branchMatches,   // [{ repoName, branch }] — every local branch whose name contains the Jira key
   projectKey,      // e.g. "SOC" — used by the client to remember repo picks per-project
+  inProgress,      // status category is "In Progress"
+
+  // GitHub PR-only fields:
+  role,            // 'reviewer' | 'author'
+  prState,         // authored only: 'draft' | 'changes-requested' | 'approved' | 'awaiting-review'
+  checks,          // authored only: 'failing' | 'pending' | 'passing' | null (from check-runs)
+  conflicts,       // mergeable_state === 'dirty'
 }
 ```
 
 ### GitHub integration
 
-`server/services/github.js` uses the **`gh` CLI** via `spawn('gh', ['api', endpoint])` — no token config required, just `gh auth login`. (No shell, so `&` in query strings reaches `gh` intact.) Two-to-three searches run in parallel: review-requested PRs, my PRs with changes-requested, and (when `GITHUB_INCLUDE_ISSUES` is not `false`) assigned issues. PRs then get a second detail call to retrieve the branch name and additions/deletions for effort estimation.
+`server/services/github.js` uses the **`gh` CLI** via `spawn('gh', ['api', endpoint])` — no token config required, just `gh auth login`. (No shell, so `&` in query strings reaches `gh` intact.) Searches run in parallel: review-requested PRs, all my open PRs, my PRs with changes-requested, my approved PRs, and (when `GITHUB_INCLUDE_ISSUES` is not `false`) assigned issues. PRs then get a detail call for branch name, additions/deletions (effort) and merge conflicts; authored PRs also get a check-runs call for CI status.
 
 ### Jira integration
 
@@ -74,7 +82,7 @@ After fetching issues, the service calls `listAllBranchesAcrossRepos()` once and
 3. Neither exists → `git worktree add -b {branch} {path}` (new branch from current HEAD), used when creating a worktree for a fresh Jira ticket.
 
 Other helpers in this module:
-- `listAllWorktrees()` — scans `{LOCAL_REPO_BASE}` for `*-worktrees` directories and returns every worktree across all repos, each tagged with `repoName`. Backs `GET /api/worktrees`.
+- `listAllWorktrees()` — scans `{LOCAL_REPO_BASE}` for `*-worktrees` directories and returns every worktree across all repos, each tagged with `repoName` plus activity: `dirtyCount`, `lastCommitAt`, `lastEditAt` (newest mtime of changed files). Backs `GET /api/worktrees`.
 - `listLocalRepos()` — returns the names of all git repos directly under `{LOCAL_REPO_BASE}`. Backs `GET /api/repos`.
 - `listAllBranchesAcrossRepos()` — `{ repoName: [branch, ...] }`, deduped and stripped of `origin/` prefix. Used by Jira auto-match.
 - `openInCode(path)` — launches VS Code via `open -a "Visual Studio Code"` with a minimal env (`HOME` + a stock `PATH`) so Launch Services starts it with the user's login env, not the dev server's nvm-modified one. Backs `POST /api/worktrees/open`.

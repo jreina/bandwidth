@@ -2,7 +2,7 @@ import simpleGit from 'simple-git';
 import { spawn } from 'child_process';
 import { join } from 'path';
 import { homedir } from 'os';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, statSync } from 'fs';
 
 function resolveBase() {
   const base = process.env.LOCAL_REPO_BASE || '~/development';
@@ -55,9 +55,34 @@ export async function listAllWorktrees() {
   }));
   // The main repo checkout shows up in `git worktree list` too — filter it out
   // so only actual added worktrees (those under {repoName}-worktrees/) remain.
-  return results.flat().filter(wt =>
+  const added = results.flat().filter(wt =>
     wt.path.includes(`${wt.repoName}-worktrees`)
   );
+  return Promise.all(added.map(async wt => ({ ...wt, ...(await getWorktreeActivity(wt.path)) })));
+}
+
+// Signals for "is this work in progress?": uncommitted changes, when they were
+// last edited, and when the branch was last committed to.
+async function getWorktreeActivity(worktreePath) {
+  if (!existsSync(worktreePath)) return { dirtyCount: 0, lastCommitAt: null, lastEditAt: null };
+  const git = simpleGit(worktreePath);
+  const [status, lastCommit] = await Promise.all([
+    git.raw(['status', '--porcelain']).catch(() => ''),
+    git.raw(['log', '-1', '--format=%cI']).catch(() => '')
+  ]);
+  // Porcelain lines are "XY path" or "XY old -> new" for renames
+  const changed = status.split('\n').filter(Boolean).map(l => l.slice(3).split(' -> ').pop());
+  let lastEditMs = 0;
+  for (const file of changed) {
+    try {
+      lastEditMs = Math.max(lastEditMs, statSync(join(worktreePath, file)).mtimeMs);
+    } catch {}
+  }
+  return {
+    dirtyCount: changed.length,
+    lastCommitAt: lastCommit.trim() || null,
+    lastEditAt: lastEditMs ? new Date(lastEditMs).toISOString() : null
+  };
 }
 
 export async function listWorktrees(repoName) {

@@ -97,6 +97,7 @@ export async function getJiraItems() {
       projectKey,
       key: issue.key,
       subtitle: issue.fields.status?.name,
+      inProgress: issue.fields.status?.statusCategory?.key === 'indeterminate',
       updatedAt: issue.fields.updated
     };
   });

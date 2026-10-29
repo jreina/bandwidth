@@ -28,6 +28,21 @@ function inferCategoryFromLabels(labels) {
   return 'task';
 }
 
+function summarizeChecks(checkRuns) {
+  if (!checkRuns?.length) return null;
+  const failed = ['failure', 'timed_out', 'cancelled', 'action_required'];
+  if (checkRuns.some(r => failed.includes(r.conclusion))) return 'failing';
+  if (checkRuns.some(r => r.status !== 'completed')) return 'pending';
+  return 'passing';
+}
+
+const AUTHORED_SUBTITLES = {
+  'draft': 'Your draft PR',
+  'changes-requested': 'Changes requested',
+  'approved': 'Approved',
+  'awaiting-review': 'Awaiting review'
+};
+
 export async function getGitHubItems() {
   const items = [];
   const includeIssues = process.env.GITHUB_INCLUDE_ISSUES !== 'false';
@@ -35,15 +50,23 @@ export async function getGitHubItems() {
   // @me is resolved by gh CLI to the authenticated user — no token config needed
   const calls = [
     ghApi('search/issues?q=is:pr+state:open+review-requested:@me&per_page=50'),
-    ghApi('search/issues?q=is:pr+state:open+author:@me+review:changes_requested&per_page=25')
+    ghApi('search/issues?q=is:pr+state:open+author:@me&per_page=50'),
+    ghApi('search/issues?q=is:pr+state:open+author:@me+review:changes_requested&per_page=50'),
+    ghApi('search/issues?q=is:pr+state:open+author:@me+review:approved&per_page=50')
   ];
   if (includeIssues) {
     calls.push(ghApi('search/issues?q=is:issue+state:open+assignee:@me&per_page=50'));
   }
-  const [reviewRes, myPRRes, issueRes] = await Promise.allSettled(calls);
+  const [reviewRes, myPRRes, changesRes, approvedRes, issueRes] = await Promise.allSettled(calls);
 
   const reviewPRs = reviewRes.status === 'fulfilled' ? reviewRes.value.items : [];
   const myPRs = myPRRes.status === 'fulfilled' ? myPRRes.value.items : [];
+  const changesRequested = new Set(
+    changesRes.status === 'fulfilled' ? changesRes.value.items.map(p => p.html_url) : []
+  );
+  const approved = new Set(
+    approvedRes.status === 'fulfilled' ? approvedRes.value.items.map(p => p.html_url) : []
+  );
   const assignedIssues = issueRes?.status === 'fulfilled' ? issueRes.value.items : [];
 
   // Deduplicate by URL
@@ -53,21 +76,33 @@ export async function getGitHubItems() {
     if (!seen.has(pr.html_url)) allPRItems.push(pr);
   }
 
-  // Fetch full PR details for branch name + additions/deletions
+  // Fetch full PR details for branch name + additions/deletions, and CI status for authored PRs
   const prDetails = await Promise.allSettled(
     allPRItems.map(async (item) => {
       const r = repoFromUrl(item.repository_url);
       if (!r) return null;
       const pr = await ghApi(`repos/${r.owner}/${r.repo}/pulls/${item.number}`);
       const isReviewer = reviewPRs.some(p => p.html_url === item.html_url);
-      return { pr, owner: r.owner, repo: r.repo, isReviewer };
+      let checks = null;
+      if (!isReviewer) {
+        try {
+          const res = await ghApi(`repos/${r.owner}/${r.repo}/commits/${pr.head.sha}/check-runs`);
+          checks = summarizeChecks(res.check_runs);
+        } catch {}
+      }
+      return { pr, owner: r.owner, repo: r.repo, isReviewer, checks };
     })
   );
 
   for (const result of prDetails) {
     if (result.status !== 'fulfilled' || !result.value) continue;
-    const { pr, owner, repo, isReviewer } = result.value;
+    const { pr, owner, repo, isReviewer, checks } = result.value;
     const changes = (pr.additions || 0) + (pr.deletions || 0);
+    const prState = isReviewer ? null
+      : pr.draft ? 'draft'
+      : changesRequested.has(pr.html_url) ? 'changes-requested'
+      : approved.has(pr.html_url) ? 'approved'
+      : 'awaiting-review';
     items.push({
       id: `github-pr-${owner}-${repo}-${pr.number}`,
       title: pr.title,
@@ -81,7 +116,11 @@ export async function getGitHubItems() {
       branch: pr.head.ref,
       number: pr.number,
       author: pr.user?.login,
-      subtitle: isReviewer ? 'Review requested' : 'Changes requested',
+      role: isReviewer ? 'reviewer' : 'author',
+      prState,
+      checks,
+      conflicts: pr.mergeable_state === 'dirty',
+      subtitle: isReviewer ? 'Review requested' : AUTHORED_SUBTITLES[prState],
       updatedAt: pr.updated_at
     });
   }
