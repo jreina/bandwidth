@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 
 function ghApi(endpoint) {
   return new Promise((resolve, reject) => {
-    const child = spawn('gh', ['api', endpoint], { shell: true });
+    const child = spawn('gh', ['api', endpoint]);
     let stdout = '', stderr = '';
     child.stdout.on('data', d => { stdout += d; });
     child.stderr.on('data', d => { stderr += d; });

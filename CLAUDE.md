@@ -58,7 +58,7 @@ Each item has an `effort` field (`small` | `medium` | `large`). The energy selec
 
 ### GitHub integration
 
-`server/services/github.js` uses the **`gh` CLI** via `spawn('gh', ['api', endpoint], { shell: true })` — no token config required, just `gh auth login`. Two-to-three searches run in parallel: review-requested PRs, my PRs with changes-requested, and (when `GITHUB_INCLUDE_ISSUES` is not `false`) assigned issues. PRs then get a second detail call to retrieve the branch name and additions/deletions for effort estimation.
+`server/services/github.js` uses the **`gh` CLI** via `spawn('gh', ['api', endpoint])` — no token config required, just `gh auth login`. (No shell, so `&` in query strings reaches `gh` intact.) Two-to-three searches run in parallel: review-requested PRs, my PRs with changes-requested, and (when `GITHUB_INCLUDE_ISSUES` is not `false`) assigned issues. PRs then get a second detail call to retrieve the branch name and additions/deletions for effort estimation.
 
 ### Jira integration
 
