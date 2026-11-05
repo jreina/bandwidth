@@ -21,6 +21,57 @@ function findBranchMatches(key, branchesByRepo) {
   return matches;
 }
 
+// Atlassian Document Format → plain text with light markdown
+function adfToText(node) {
+  if (!node) return '';
+  if (node.type === 'text') return node.text;
+  if (node.type === 'hardBreak') return '\n';
+  if (['mention', 'emoji'].includes(node.type)) return node.attrs?.text ?? '';
+  if (['inlineCard', 'blockCard'].includes(node.type)) return node.attrs?.url ?? '';
+  const inner = (node.content || []).map(adfToText).join('');
+  switch (node.type) {
+    case 'paragraph': return inner + '\n\n';
+    case 'heading': return `${'#'.repeat(node.attrs?.level ?? 3)} ${inner}\n\n`;
+    case 'listItem': return `- ${inner.trim().replace(/\n+/g, '\n  ')}\n`;
+    case 'bulletList':
+    case 'orderedList': return inner + '\n';
+    case 'codeBlock': return '```\n' + inner + '\n```\n\n';
+    case 'blockquote': return inner.trim().split('\n').map(l => `> ${l}`).join('\n') + '\n\n';
+    default: return inner;
+  }
+}
+
+// Full detail for one issue, for handing off to Claude
+export async function getJiraIssueDetail(key) {
+  const { JIRA_HOST, JIRA_EMAIL, JIRA_API_TOKEN } = process.env;
+  if (!JIRA_HOST || !JIRA_EMAIL || !JIRA_API_TOKEN) throw new Error('Jira is not configured');
+
+  const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
+  const fields = 'summary,description,issuetype,priority,status,labels,parent,comment';
+  const res = await fetch(`https://${JIRA_HOST}/rest/api/3/issue/${encodeURIComponent(key)}?fields=${fields}`, {
+    headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' }
+  });
+  if (!res.ok) throw new Error(`Jira API error ${res.status} fetching ${key}`);
+  const { fields: f } = await res.json();
+
+  return {
+    key,
+    url: `https://${JIRA_HOST}/browse/${key}`,
+    summary: f.summary,
+    type: f.issuetype?.name ?? null,
+    status: f.status?.name ?? null,
+    priority: f.priority?.name ?? null,
+    labels: f.labels ?? [],
+    parent: f.parent ? `${f.parent.key}: ${f.parent.fields?.summary ?? ''}` : null,
+    description: adfToText(f.description).trim(),
+    comments: (f.comment?.comments ?? []).slice(-5).map(c => ({
+      author: c.author?.displayName ?? 'Unknown',
+      created: c.created,
+      body: adfToText(c.body).trim()
+    }))
+  };
+}
+
 export async function getJiraItems() {
   const { JIRA_HOST, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_PROJECT_KEYS } = process.env;
   if (!JIRA_HOST || !JIRA_EMAIL || !JIRA_API_TOKEN) return [];

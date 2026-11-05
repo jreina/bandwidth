@@ -63,4 +63,6 @@ Jira items also get a worktree button. If a local branch already mentions the is
 
 **Claude Code sessions**: every worktree card lists the Claude Code sessions started in it, showing each session's title, your last prompt, and how long ago it was active. A green dot marks a worktree where `claude` is running right now. **Resume** opens a Terminal.app window running `claude --resume` in that worktree; **Copy command** gives you the same command to paste anywhere. Session activity counts toward "last activity", and a worktree with Claude running shows up in In flight even if it has no matching PR or ticket.
 
+**Assign to Claude**: Jira, PR and issue cards with a worktree get an **Assign to Claude** button (**Review with Claude** for review requests). It opens Claude Code in Terminal, inside that worktree, with the task already loaded: the full Jira issue with its recent comments, or instructions to pull PR feedback and CI status with `gh`. Claude works interactively, asks when something is unclear, and commits locally, but won't push, open PRs, post comments or change the Jira issue without asking you.
+
 **"Open in Code" prerequisite** — the server uses `open -a "Visual Studio Code"` on macOS. VS Code must be installed in `/Applications`; the `code` CLI itself is not required.

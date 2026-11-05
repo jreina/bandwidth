@@ -89,6 +89,14 @@ Other helpers in this module:
 
 `POST /api/claude/resume { sessionId }` validates the id as a UUID, looks the session up server-side (the client never sends a path or command), and runs `osascript` to open a Terminal.app window with `cd '{cwd}' && claude --resume {id}`.
 
+`POST /api/claude/assign { item, worktreePath }` ("Assign to Claude" / "Review with Claude" on Jira, PR and issue cards that have a worktree) validates the item's key or repo/number and requires `worktreePath` to be one of `listAllWorktrees()`. `server/services/taskBrief.js` then builds an opening prompt:
+- **Jira:** full issue detail via `getJiraIssueDetail()` (description and last 5 comments, converted from ADF to text).
+- **Authored PR:** tells Claude which `gh` commands to run for review comments, inline comments and checks.
+- **Review-requested PR:** asks for findings only, with no code changes or GitHub posts.
+- **GitHub issue:** tells Claude to run `gh issue view`.
+
+Every brief ends with a working agreement: explore first, ask on ambiguity, commit locally, and never push, PR, comment or change Jira without asking. The brief is written to `server/data/briefs/` and launched in Terminal.app as `claude -n '{title}' "$(cat '{brief}')"`, so the session is interactive and uses the user's default permission mode.
+
 ### Personal state
 
 `server/services/store.js` keeps what GitHub/Jira don't know in `server/data/state.json` (gitignored), served under `/api/state`:

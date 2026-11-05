@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { resumeSession } from '../services/claude.js';
+import { resumeSession, assignToClaude } from '../services/claude.js';
 
 const router = Router();
 
@@ -11,6 +11,18 @@ router.post('/resume', async (req, res) => {
   try {
     await resumeSession(sessionId);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/assign', async (req, res) => {
+  const { item, worktreePath } = req.body;
+  if (!item || !worktreePath) {
+    return res.status(400).json({ error: 'item and worktreePath are required' });
+  }
+  try {
+    res.json(await assignToClaude(item, worktreePath));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

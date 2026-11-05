@@ -11,6 +11,8 @@ const SOURCE_LABELS = {
   'commitment':   'Commitment'
 };
 
+const ASSIGNABLE_SOURCES = new Set(['jira', 'github-pr', 'github-issue']);
+
 function at8am(daysFromNow) {
   const d = new Date();
   d.setDate(d.getDate() + daysFromNow);
@@ -133,6 +135,31 @@ export default function WorkItem({
   }
 
   const showWorktreeSection = !!item.branch || needsPicker;
+  const canAssign = !!activeWorktree?.path && ASSIGNABLE_SOURCES.has(item.source);
+  const [assignStatus, setAssignStatus] = useState(null);
+
+  async function assignToClaude() {
+    if (activeWorktree.claudeRunning &&
+        !window.confirm('Claude is already running in this worktree. Start another session?')) return;
+    setAssignStatus({ busy: true });
+    try {
+      const res = await fetch('/api/claude/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          worktreePath: activeWorktree.path,
+          item: {
+            source: item.source, key: item.key, repo: item.repo, number: item.number,
+            role: item.role, title: item.title, url: item.url
+          }
+        })
+      });
+      const data = await res.json();
+      setAssignStatus(data.error ? { error: data.error } : { ok: 'Claude started in Terminal' });
+    } catch (e) {
+      setAssignStatus({ error: e.message });
+    }
+  }
 
   function startEditingNote() {
     cancelNoteRef.current = false;
@@ -281,7 +308,19 @@ export default function WorkItem({
                 Open in Code
               </button>
             )}
+            {canAssign && (
+              <button
+                className="worktree-btn claude"
+                onClick={assignToClaude}
+                disabled={assignStatus?.busy}
+                title="Open Claude Code in this worktree with the task loaded"
+              >
+                {assignStatus?.busy ? '…' : item.role === 'reviewer' ? 'Review with Claude' : 'Assign to Claude'}
+              </button>
+            )}
           </div>
+          {assignStatus?.ok && <span className="claude-session-ok">{assignStatus.ok}</span>}
+          {assignStatus?.error && <span className="worktree-error">{assignStatus.error}</span>}
         </div>
       )}
     </div>

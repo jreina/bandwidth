@@ -1,8 +1,11 @@
-import { readdir, stat, open } from 'fs/promises';
+import { readdir, stat, open, mkdir, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, basename } from 'path';
+import { join, basename, dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { execFile, spawn } from 'child_process';
+import { listAllWorktrees } from './git.js';
+import { buildTaskBrief, sessionName } from './taskBrief.js';
 
 // Claude Code writes one JSONL transcript per session under
 // ~/.claude/projects/{encoded-cwd}/{sessionId}.jsonl. Each entry carries the cwd,
@@ -13,6 +16,10 @@ const PROJECTS_DIR = join(homedir(), '.claude', 'projects');
 const HEAD_BYTES = 64 * 1024;
 const TAIL_BYTES = 256 * 1024;
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const JIRA_KEY_RE = /^[A-Z][A-Z0-9_]*-\d+$/;
+const GITHUB_REPO_RE = /^[\w.-]+\/[\w.-]+$/;
+// Briefs live next to the personal state file (gitignored), not in the worktree
+const BRIEFS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../data/briefs');
 
 const cache = new Map(); // file → { mtimeMs, size, session }
 
@@ -146,18 +153,54 @@ function appleScriptString(s) {
   return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
+function openInTerminal(command) {
+  const child = spawn('osascript', [
+    '-e', 'tell application "Terminal"',
+    '-e', 'activate',
+    '-e', `do script ${appleScriptString(command)}`,
+    '-e', 'end tell'
+  ], { detached: true, stdio: 'ignore' });
+  child.unref();
+}
+
 // Opens a new Terminal.app window resuming the session in its original directory
 export async function resumeSession(sessionId) {
   if (!SESSION_ID_RE.test(sessionId)) throw new Error('Invalid session id');
   const session = (await listSessions()).find(s => s.id === sessionId);
   if (!session) throw new Error('Session not found');
   if (!existsSync(session.cwd)) throw new Error(`Directory no longer exists: ${session.cwd}`);
+  openInTerminal(session.resumeCommand);
+}
 
-  const child = spawn('osascript', [
-    '-e', 'tell application "Terminal"',
-    '-e', 'activate',
-    '-e', `do script ${appleScriptString(session.resumeCommand)}`,
-    '-e', 'end tell'
-  ], { detached: true, stdio: 'ignore' });
-  child.unref();
+function validateItem(item) {
+  if (item?.source === 'jira') {
+    if (!JIRA_KEY_RE.test(item.key ?? '')) throw new Error('Invalid Jira key');
+  } else if (item?.source === 'github-pr' || item?.source === 'github-issue') {
+    if (!GITHUB_REPO_RE.test(item.repo ?? '') || !Number.isInteger(item.number)) {
+      throw new Error('Invalid GitHub repo or number');
+    }
+  } else {
+    throw new Error(`Can't assign a ${item?.source ?? 'unknown'} item to Claude`);
+  }
+}
+
+// Starts an interactive Claude session in the item's worktree, seeded with a
+// task brief. Interactive so Claude can ask questions; the user's default
+// permission mode applies.
+export async function assignToClaude(item, worktreePath) {
+  validateItem(item);
+  const worktree = (await listAllWorktrees()).find(wt => wt.path === worktreePath);
+  if (!worktree) throw new Error('Worktree not found');
+
+  const brief = await buildTaskBrief(item, worktree);
+  await mkdir(BRIEFS_DIR, { recursive: true });
+  const slug = (item.key || `${item.repo}-${item.number}`).replace(/[^\w.-]+/g, '-');
+  const briefPath = join(BRIEFS_DIR, `${new Date().toISOString().replace(/[:.]/g, '-')}-${slug}.md`);
+  await writeFile(briefPath, brief);
+
+  // The brief is read via $(cat …) so its contents never pass through quoting
+  openInTerminal(
+    `cd ${shellQuote(worktree.path)} && claude -n ${shellQuote(sessionName(item))} "$(cat ${shellQuote(briefPath)})"`
+  );
+  return { briefPath };
 }

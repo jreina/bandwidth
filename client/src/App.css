@@ -799,3 +799,9 @@ select.item-action { background: var(--bg); }
   font-size: 0.65rem;
   color: #10b981;
 }
+.worktree-btn.claude {
+  background: rgba(217,119,87,0.08);
+  border-color: rgba(217,119,87,0.4);
+  color: #e0896b;
+}
+.worktree-btn.claude:hover { background: rgba(217,119,87,0.16); border-color: #d97757; }
