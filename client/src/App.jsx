@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import WorkCategory from './components/WorkCategory.jsx';
 import NewWorktree from './components/NewWorktree.jsx';
@@ -8,6 +8,7 @@ import Snoozed from './components/Snoozed.jsx';
 import ClaudeSessions from './components/ClaudeSessions.jsx';
 import { buildInFlight } from './inFlight.js';
 import { byUrgency } from './urgency.js';
+import { parseQuery, matches, worktreeMatches } from './search.js';
 
 const BASE_CATEGORIES = [
   { id: 'code-review', label: 'Code Review', color: '#3b82f6' },
@@ -26,6 +27,21 @@ export default function App() {
   const [repos, setRepos] = useState([]);
   const [annotations, setAnnotations] = useState({});
   const [commitments, setCommitments] = useState([]);
+  const [query, setQuery] = useState('');
+  const searchRef = useRef(null);
+
+  // "/" jumps to search from anywhere that isn't already a text field
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   useEffect(() => {
     fetch('/api/config')
@@ -169,9 +185,20 @@ export default function App() {
   // In-flight work is pulled out of the categories into its own lane
   const inFlight = buildInFlight(items, worktrees, { annotations, commitments });
   const queuedItems = items.filter(i => !inFlight.itemIds.has(i.id)).sort(byUrgency);
+
+  // Search narrows every section but doesn't change what counts as in flight
+  const terms = parseQuery(query);
+  const searching = terms.length > 0;
+  const entryMatches = e => matches(terms, e.item, e.worktree, e.annotation);
+  const visibleEntries = inFlight.entries.filter(entryMatches);
+  const visibleDormant = inFlight.dormant.filter(entryMatches);
+  const visibleSnoozed = inFlight.snoozed.filter(entryMatches);
+  const visibleQueued = queuedItems.filter(i => matches(
+    terms, i, i.branch ? worktrees[`${i.repoName}/${i.branch}`] : null, annotations[i.id]
+  ));
   const grouped = categories.map(cat => ({
     ...cat,
-    items: queuedItems.filter(i => i.category === cat.id)
+    items: visibleQueued.filter(i => i.category === cat.id)
   }));
 
   // Orphan worktrees: on disk but no active item references them
@@ -180,7 +207,10 @@ export default function App() {
   );
   const orphanWorktrees = Object.entries(worktrees)
     .filter(([key]) => !activeKeys.has(key) && !inFlight.worktreeKeys.has(key))
-    .map(([key, wt]) => ({ key, ...wt }));
+    .map(([key, wt]) => ({ key, ...wt }))
+    .filter(wt => worktreeMatches(terms, wt));
+  const matchCount = visibleEntries.length + visibleDormant.length + visibleSnoozed.length +
+    visibleQueued.length + orphanWorktrees.length;
 
   async function handleRemoveOrphan(wt) {
     await fetch('/api/worktrees', {
@@ -211,9 +241,23 @@ export default function App() {
             <h1>What needs you</h1>
             {!loading && (
               <p className="item-count">
-                {inFlight.entries.length} in flight · {queuedItems.length} queued
+                {searching
+                  ? `${matchCount} match${matchCount !== 1 ? 'es' : ''}`
+                  : `${inFlight.entries.length} in flight · ${queuedItems.length} queued`}
               </p>
             )}
+          </div>
+          <div className="search-field">
+            <input
+              ref={searchRef}
+              className="search-input"
+              type="search"
+              placeholder="Search title, key, #number, branch…  ( / )"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur(); } }}
+              aria-label="Search items"
+            />
           </div>
           <button
             className="refresh-btn"
@@ -240,8 +284,9 @@ export default function App() {
         ) : (
           <>
             <InFlight
-              entries={inFlight.entries}
-              dormant={inFlight.dormant}
+              entries={visibleEntries}
+              dormant={visibleDormant}
+              searching={searching}
               repos={repos}
               onAnnotate={handleAnnotate}
               onAddCommitment={handleAddCommitment}
@@ -256,6 +301,7 @@ export default function App() {
                 <WorkCategory
                   key={cat.id}
                   category={cat}
+                  searching={searching}
                   worktrees={worktrees}
                   repos={repos}
                   annotations={annotations}
@@ -266,7 +312,8 @@ export default function App() {
               ))}
             </div>
             <Snoozed
-              entries={inFlight.snoozed}
+              entries={visibleSnoozed}
+              searching={searching}
               repos={repos}
               onAnnotate={handleAnnotate}
               onCompleteCommitment={handleCompleteCommitment}

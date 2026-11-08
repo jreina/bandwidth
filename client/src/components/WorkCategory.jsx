@@ -1,6 +1,6 @@
 import WorkItem from './WorkItem.jsx';
 
-export default function WorkCategory({ category, worktrees, repos, annotations, onAnnotate, onCreateWorktree, onRemoveWorktree }) {
+export default function WorkCategory({ category, searching, worktrees, repos, annotations, onAnnotate, onCreateWorktree, onRemoveWorktree }) {
   return (
     <div className="work-category" style={{ '--cat-color': category.color }}>
       <div className="category-header">
@@ -9,7 +9,7 @@ export default function WorkCategory({ category, worktrees, repos, annotations, 
       </div>
       <div className="category-items">
         {category.items.length === 0 ? (
-          <div className="empty-state">Nothing here</div>
+          <div className="empty-state">{searching ? 'No matches' : 'Nothing here'}</div>
         ) : (
           category.items.map(item => (
             <WorkItem

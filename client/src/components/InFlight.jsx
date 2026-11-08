@@ -51,7 +51,7 @@ function NewCommitment({ onAdd }) {
 }
 
 export default function InFlight({
-  entries, dormant, repos, onAnnotate, onAddCommitment, onCompleteCommitment,
+  entries, dormant, searching, repos, onAnnotate, onAddCommitment, onCompleteCommitment,
   onCreateWorktree, onRemoveWorktree
 }) {
   const [showDormant, setShowDormant] = useState(false);
@@ -90,9 +90,9 @@ export default function InFlight({
       {dormant.length > 0 && (
         <>
           <button className="in-flight-dormant-toggle" onClick={() => setShowDormant(v => !v)}>
-            {showDormant ? '▾' : '▸'} {dormant.length} dormant (idle {DORMANT_AFTER_DAYS}+ days). Finish or close these.
+            {showDormant || searching ? '▾' : '▸'} {dormant.length} dormant (idle {DORMANT_AFTER_DAYS}+ days). Finish or close these.
           </button>
-          {showDormant && (
+          {(showDormant || searching) && (
             <div className="in-flight-grid">{dormant.map(renderEntry)}</div>
           )}
         </>

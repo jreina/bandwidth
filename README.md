@@ -65,6 +65,8 @@ Jira items also get a worktree button. If a local branch already mentions the is
 
 **Assign to Claude**: Jira, PR and issue cards with a worktree get an **Assign to Claude** button (**Review with Claude** for review requests). It opens Claude Code in Terminal, inside that worktree, with the task already loaded: the full Jira issue with its recent comments, or instructions to pull PR feedback and CI status with `gh`. Claude works interactively, asks when something is unclear, and commits locally, but won't push, open PRs, post comments or change the Jira issue without asking you. The Terminal tab is titled after the ticket or session, and stays that way.
 
+**Search**: the box in the header (press `/` to jump to it, `Esc` to clear) filters every section by partial match on title, Jira key, `#number`, repo, branch, worktree path, your note, or Claude session titles. Separate words must all match, so `edge 109` finds EDGE-109. Collapsed sections (dormant, snoozed) open while you search so nothing matching is hidden.
+
 **New Jira issue**: pick a board, an issue type and a summary (plus an optional description), and tick **Assign to me** to have it land on your dashboard right away. Boards for the projects in `JIRA_PROJECT_KEYS` are listed first, and your last board is remembered. On a scrum board, the new issue goes to the backlog.
 
 **"Open in Code" prerequisite** — the server uses `open -a "Visual Studio Code"` on macOS. VS Code must be installed in `/Applications`; the `code` CLI itself is not required.

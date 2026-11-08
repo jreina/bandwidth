@@ -29,6 +29,7 @@ This is a two-process app: an Express server (`server/`) and a React+Vite client
 3. `buildInFlight()` (`client/src/inFlight.js`) pulls already-started work out of the categories into an **In flight** lane at the top: pinned items, commitments, your open PRs, Jira issues whose status category is "In Progress", any item with a worktree, and ad-hoc worktrees with uncommitted changes. Snoozed items (from anywhere) go to a collapsed "Snoozed" section until their snooze ends. Entries carry signals (due date, PR state, CI, conflicts, uncommitted files, last activity) and are sorted pinned-first, then actionable, then most neglected. Pinned items and commitments never go dormant. Entries idle more than 7 days are flagged as stalled; entries idle more than 90 days are collapsed under "dormant".
 4. The remaining items are sorted by `byUrgency()` (`client/src/urgency.js`: review requests first, then Jira priority, then oldest first) and grouped into category columns. Nothing is filtered out.
 5. Worktrees on disk with no uncommitted changes, no running Claude session, and no matching item are shown in a "Stale worktrees" section under the categories grid.
+6. The header search box (`/` to focus) filters every section with `matches()` (`client/src/search.js`): case-insensitive, each whitespace-separated term must appear in the item's title, key, repo, `#number`, branch, worktree path, note or Claude session titles. It only filters what's shown; dormant and snoozed sections open while searching.
 
 ### Work item shape
 
