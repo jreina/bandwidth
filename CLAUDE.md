@@ -68,6 +68,11 @@ This is a two-process app: an Express server (`server/`) and a React+Vite client
 
 `server/services/jira.js` calls the Jira REST API v3 directly with Basic auth. `JIRA_SPOTLIGHT_PROJECT` (e.g. `SOC`) causes issues from that project to bypass bug/docs type detection and land in their own category column. The category ID is `spotlightProject.toLowerCase()`. The frontend fetches this value from `/api/config` on mount and appends the column dynamically.
 
+Creating issues (the "New Jira issue" form, `client/src/components/NewJiraIssue.jsx`):
+- `GET /api/jira/boards`: every board with a project location (agile API), configured projects first. The board only picks the project; the issue lands on that project's boards.
+- `GET /api/jira/projects/:key/issuetypes`: non-subtask issue types from createmeta.
+- `POST /api/jira/issues { projectKey, issueTypeId, summary, description, assignToMe }`: description is converted from plain text to ADF; `assignToMe` sets the assignee from `/rest/api/3/myself` (cached). Jira's field errors are passed back as the error message.
+
 After fetching issues, the service calls `listAllBranchesAcrossRepos()` once and scans every local branch for a word-boundary match on each issue key (e.g. `SOC-123`). If exactly one repo has a matching branch, `repoName` + `branch` are prefilled so the issue gets a worktree button identical to a GitHub PR. Otherwise the issue ships with `suggestedBranch` (synthesized as `{KEY}-{slug-of-summary}`) and the client renders a repo picker; the choice is remembered per-project in `localStorage` under `jiraProjectRepo:{KEY}`.
 
 ### Git worktree integration

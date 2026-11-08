@@ -41,6 +41,92 @@ function adfToText(node) {
   }
 }
 
+function jiraConfig() {
+  const { JIRA_HOST, JIRA_EMAIL, JIRA_API_TOKEN } = process.env;
+  if (!JIRA_HOST || !JIRA_EMAIL || !JIRA_API_TOKEN) throw new Error('Jira is not configured');
+  return { host: JIRA_HOST, auth: Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64') };
+}
+
+async function jiraFetch(path, { method = 'GET', body } = {}) {
+  const { host, auth } = jiraConfig();
+  const res = await fetch(`https://${host}${path}`, {
+    method,
+    headers: {
+      Authorization: `Basic ${auth}`,
+      Accept: 'application/json',
+      ...(body && { 'Content-Type': 'application/json' })
+    },
+    body: body && JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    // Jira reports problems as { errorMessages: [...], errors: { field: message } }
+    const details = [...(data?.errorMessages ?? []), ...Object.values(data?.errors ?? {})];
+    throw new Error(details.length ? details.join('; ') : `Jira API error ${res.status}`);
+  }
+  return data;
+}
+
+// Plain text → ADF: blank lines separate paragraphs, single newlines are line breaks
+function textToAdf(text) {
+  const paragraphs = text.trim().split(/\n\s*\n/).map(para => ({
+    type: 'paragraph',
+    content: para.split('\n').flatMap((line, i) => [
+      ...(i > 0 ? [{ type: 'hardBreak' }] : []),
+      ...(line ? [{ type: 'text', text: line }] : [])
+    ])
+  }));
+  return { type: 'doc', version: 1, content: paragraphs };
+}
+
+// Every board tied to a project, with the configured projects first
+export async function getJiraBoards() {
+  const boards = [];
+  for (let startAt = 0; ; ) {
+    const page = await jiraFetch(`/rest/agile/1.0/board?startAt=${startAt}&maxResults=50`);
+    boards.push(...page.values);
+    startAt += page.values.length;
+    if (page.isLast || page.values.length === 0) break;
+  }
+  const preferred = (process.env.JIRA_PROJECT_KEYS || '').split(',').map(k => k.trim().toUpperCase());
+  const rank = b => (preferred.includes(b.projectKey) ? 0 : 1);
+  return boards
+    .filter(b => b.location?.projectKey)
+    .map(b => ({ id: b.id, name: b.name, type: b.type, projectKey: b.location.projectKey }))
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+}
+
+const PROJECT_KEY_RE = /^[A-Z][A-Z0-9_]*$/;
+
+export async function getJiraIssueTypes(projectKey) {
+  if (!PROJECT_KEY_RE.test(projectKey)) throw new Error('Invalid project key');
+  const data = await jiraFetch(`/rest/api/3/issue/createmeta/${projectKey}/issuetypes?maxResults=100`);
+  return (data.issueTypes ?? data.values ?? [])
+    .filter(t => !t.subtask)
+    .map(t => ({ id: t.id, name: t.name }));
+}
+
+let myAccountId = null;
+
+export async function createJiraIssue({ projectKey, issueTypeId, summary, description, assignToMe }) {
+  if (!PROJECT_KEY_RE.test(projectKey ?? '')) throw new Error('Invalid project key');
+  if (!/^\d+$/.test(issueTypeId ?? '')) throw new Error('Invalid issue type');
+  const title = (summary ?? '').replace(/\s+/g, ' ').trim();
+  if (!title) throw new Error('Summary is required');
+  if (title.length > 255) throw new Error('Summary must be 255 characters or fewer');
+
+  if (assignToMe && !myAccountId) myAccountId = (await jiraFetch('/rest/api/3/myself')).accountId;
+  const fields = {
+    project: { key: projectKey },
+    issuetype: { id: issueTypeId },
+    summary: title,
+    ...(description?.trim() && { description: textToAdf(description) }),
+    ...(assignToMe && { assignee: { accountId: myAccountId } })
+  };
+  const { key } = await jiraFetch('/rest/api/3/issue', { method: 'POST', body: { fields } });
+  return { key, url: `https://${jiraConfig().host}/browse/${key}` };
+}
+
 // Full detail for one issue, for handing off to Claude
 export async function getJiraIssueDetail(key) {
   const { JIRA_HOST, JIRA_EMAIL, JIRA_API_TOKEN } = process.env;

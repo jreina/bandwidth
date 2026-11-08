@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import WorkCategory from './components/WorkCategory.jsx';
 import NewWorktree from './components/NewWorktree.jsx';
+import NewJiraIssue from './components/NewJiraIssue.jsx';
 import InFlight from './components/InFlight.jsx';
 import Snoozed from './components/Snoozed.jsx';
 import ClaudeSessions from './components/ClaudeSessions.jsx';
@@ -249,6 +250,7 @@ export default function App() {
               onRemoveWorktree={handleRemoveWorktree}
             />
             <NewWorktree repos={repos} onCreate={handleCreateAdHocWorktree} />
+            <NewJiraIssue onCreated={fetchAll} />
             <div className="categories-grid">
               {grouped.map(cat => (
                 <WorkCategory

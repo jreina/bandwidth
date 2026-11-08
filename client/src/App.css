@@ -449,6 +449,34 @@ h1 {
 }
 .new-worktree-clear:hover { color: var(--text); background: var(--surface-hover); }
 
+/* ── New Jira issue (reuses the new-worktree layout) ── */
+.new-worktree-row.align-top { align-items: flex-start; }
+.new-worktree-row.align-top .new-worktree-label { padding-top: 0.4rem; }
+
+.jira-summary,
+.jira-description {
+  max-width: 520px;
+  padding-right: 0.5rem;
+  font-family: inherit;
+}
+.jira-description { resize: vertical; }
+
+.jira-assign {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-left: calc(48px + 0.5rem);
+  cursor: pointer;
+}
+
+.jira-created {
+  font-size: 0.75rem;
+  color: #10b981;
+}
+.jira-created a { color: inherit; font-weight: 600; }
+
 /* ── Orphan worktrees ── */
 .orphan-section {
   margin-top: 2rem;
