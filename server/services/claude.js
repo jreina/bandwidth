@@ -153,11 +153,24 @@ function appleScriptString(s) {
   return `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-function openInTerminal(command) {
+// Single line, no control characters, short enough for a tab title
+function terminalTitle(s) {
+  return s.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, 80);
+}
+
+// Opens a Terminal.app tab titled `title`, showing only that title. Claude
+// Code's own title updates are turned off so they don't replace it.
+function openInTerminal(command, title) {
   const child = spawn('osascript', [
     '-e', 'tell application "Terminal"',
     '-e', 'activate',
-    '-e', `do script ${appleScriptString(command)}`,
+    '-e', `set newTab to do script ${appleScriptString(`export CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1; ${command}`)}`,
+    '-e', `set custom title of newTab to ${appleScriptString(terminalTitle(title))}`,
+    '-e', 'set title displays custom title of newTab to true',
+    '-e', 'set title displays shell path of newTab to false',
+    '-e', 'set title displays device name of newTab to false',
+    '-e', 'set title displays window size of newTab to false',
+    '-e', 'set title displays file name of newTab to false',
     '-e', 'end tell'
   ], { detached: true, stdio: 'ignore' });
   child.unref();
@@ -169,7 +182,7 @@ export async function resumeSession(sessionId) {
   const session = (await listSessions()).find(s => s.id === sessionId);
   if (!session) throw new Error('Session not found');
   if (!existsSync(session.cwd)) throw new Error(`Directory no longer exists: ${session.cwd}`);
-  openInTerminal(session.resumeCommand);
+  openInTerminal(session.resumeCommand, session.title);
 }
 
 function validateItem(item) {
@@ -199,8 +212,10 @@ export async function assignToClaude(item, worktreePath) {
   await writeFile(briefPath, brief);
 
   // The brief is read via $(cat …) so its contents never pass through quoting
+  const name = sessionName(item);
   openInTerminal(
-    `cd ${shellQuote(worktree.path)} && claude -n ${shellQuote(sessionName(item))} "$(cat ${shellQuote(briefPath)})"`
+    `cd ${shellQuote(worktree.path)} && claude -n ${shellQuote(name)} "$(cat ${shellQuote(briefPath)})"`,
+    name
   );
   return { briefPath };
 }

@@ -97,6 +97,8 @@ Other helpers in this module:
 
 Every brief ends with a working agreement: explore first, ask on ambiguity, commit locally, and never push, PR, comment or change Jira without asking. The brief is written to `server/data/briefs/` and launched in Terminal.app as `claude -n '{title}' "$(cat '{brief}')"`, so the session is interactive and uses the user's default permission mode.
 
+Both resume and assign open a Terminal tab whose custom title is the session or item title (other title elements turned off), and export `CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1` so Claude Code doesn't overwrite it.
+
 ### Personal state
 
 `server/services/store.js` keeps what GitHub/Jira don't know in `server/data/state.json` (gitignored), served under `/api/state`:
